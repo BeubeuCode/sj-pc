@@ -92,3 +92,12 @@ in the same egui pass.
 `sj-lab` plays input scripts at roughly 8x real time and snapshots RAM and screens. Mode detection was
 found by diffing about 90 snapshots. Public Action Replay codes supplied player, battle-unit and item
 addresses.
+
+## 017 Code patches that switch at runtime go through the cheat engine
+melonDS's JIT keeps compiled blocks when the host writes main RAM, so a patch written through
+`GameApi` only works if the block was not compiled yet (right after a state load). Writes from the
+core's Action Replay engine go through the emulated bus, which drops compiled blocks. The
+top-screen 60fps patch must turn on and off as the layout changes, so it is an Action Replay code
+set with `retro_cheat_set`, guarded by "if equal" checks so it only touches the expected
+instructions. A `sj_game::patch::Patch` stays the tool for patches applied once.
+

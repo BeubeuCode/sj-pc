@@ -1,4 +1,4 @@
-use std::ffi::{c_uint, c_void, CString};
+use std::ffi::{c_char, c_uint, c_void, CString};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -42,6 +42,7 @@ struct Api {
     unserialize: unsafe extern "C" fn(*const c_void, usize) -> bool,
     get_memory_data: unsafe extern "C" fn(c_uint) -> *mut c_void,
     get_memory_size: unsafe extern "C" fn(c_uint) -> usize,
+    cheat_set: unsafe extern "C" fn(c_uint, bool, *const c_char),
 }
 
 pub struct Core {
@@ -102,6 +103,7 @@ impl Core {
             unserialize: symbol!(library, "retro_unserialize"),
             get_memory_data: symbol!(library, "retro_get_memory_data"),
             get_memory_size: symbol!(library, "retro_get_memory_size"),
+            cheat_set: symbol!(library, "retro_cheat_set"),
         };
         Ok(Self {
             api,
@@ -198,6 +200,14 @@ impl Core {
             host.variables.insert(key.to_string(), to_cstring(value));
             host.variables_changed = true;
         });
+    }
+
+    // Replaces cheat `index` with an Action Replay code ("XXXXXXXX YYYYYYYY" pairs) that the core
+    // runs every VBlank. Its writes go through the emulated bus, so the JIT drops code they change.
+    pub fn set_cheat(&self, index: u32, code: &str) {
+        let code = to_cstring(code);
+        // SAFETY: `code` is NUL-terminated and outlives the call; the core copies it.
+        unsafe { (self.api.cheat_set)(index, true, code.as_ptr()) };
     }
 
     pub fn set_input(&self, joypad_mask: u16, pointer: Pointer) {

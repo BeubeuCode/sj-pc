@@ -47,3 +47,6 @@ HD textures, netplay, Redux (3DS) content, public release packaging, native plug
   skills. The game's element icons would need its graphics loaded from the ROM at runtime. The hero's
   affinities come from gear and are not mapped yet.
 - Heading-up minimap needs player position and facing (collision code at `0x0202FDD4` is the lead).
+- 60fps: battles and dungeons already run at 60. The ship and facilities run at 60 while shown
+  top-only (`top_screen_60fps`). Menus shown side by side stay at 30 per screen: the game draws one
+  screen per frame, and lifting that means making it build both screens every frame.

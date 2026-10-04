@@ -100,6 +100,10 @@ impl HotkeyAction {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "each flag is an independent switch in sj.toml"
+)]
 pub struct VideoSettings {
     pub scale: u32,
     pub fullscreen: bool,
@@ -108,6 +112,7 @@ pub struct VideoSettings {
     pub window_height_px: u32,
     pub filter: ScalingFilter,
     pub widescreen: bool,
+    pub top_screen_60fps: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -208,6 +213,7 @@ impl Default for VideoSettings {
             window_height_px: 960,
             filter: ScalingFilter::Smooth,
             widescreen: true,
+            top_screen_60fps: true,
         }
     }
 }

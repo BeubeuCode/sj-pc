@@ -25,6 +25,7 @@ header and only enables Play for Strange Journey USA (`BMTE`) with a core presen
 | `fullscreen` | `false` | Start in borderless fullscreen |
 | `vsync` | `true` | Sync presents to the display |
 | `widescreen` | `true` | 16:9 3D when the top screen is shown alone; needs our patched core and the OpenGL renderer |
+| `top_screen_60fps` | `true` | While the top screen is shown alone, keep the game's 3D on it every frame: 60fps instead of 30 on the ship and in facilities. The hidden bottom screen stops updating until it is shown again |
 | `window_width_px`, `window_height_px` | `1280`, `960` | Starting window size; the window is resizable |
 | `filter` | `smooth` | `smooth` (bilinear) or `sharp` (nearest-neighbour) scaling of the screens |
 

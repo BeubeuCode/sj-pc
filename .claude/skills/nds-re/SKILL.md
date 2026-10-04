@@ -31,6 +31,11 @@ String table entries are numbered from 2 (entry = ID + 2).
 
 ## Recipes
 - **Find a variable:** follow the memory-diff recipe in `docs/re/README.md`, then confirm with a Ghidra xref.
+- **JIT and code writes:** melonDS's JIT ignores host writes to main RAM code once compiled. Poke
+  code right after a `load` (the load resets the JIT) for experiments; for a runtime switch use an
+  Action Replay code through `Core::set_cheat` (see `sj_game::top_screen_only`).
+- **Measure a scene's frame rate:** hash each screen per frame in the lab and count changes; 30fps
+  scenes change on alternate frames, top and bottom out of phase when 3D alternates screens.
 - **Patch code or data:** add a `sj_game::patch::Patch` with the exact original bytes. `apply` refuses on
   mismatch, so a different ROM revision fails loudly. Test it against `FakeGame` in the same file.
 - **Record every find** in `docs/re/symbols.txt` (`address size name notes`) and `docs/re/MEMORY_MAP.md`.

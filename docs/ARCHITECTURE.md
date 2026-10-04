@@ -73,6 +73,12 @@ The `Presenter` blits the main screens. HUD overlays are drawn by egui from the 
 texture (`hud.rs`, registered as an egui native texture), which gives cropping and opacity without
 writing shaders. Touch goes to whichever bottom-screen rectangle is visible.
 
+Menus, facilities and the ship draw 3D on both screens by alternating them, so each gets 30fps.
+While the plan shows the top screen alone, `App::sync_top_screen_only` installs a two-instruction
+code patch (`sj_game::top_screen_only`) that keeps the 3D on the top screen, which then runs at 60.
+It goes through the core's Action Replay engine (`Core::set_cheat`) because the JIT ignores host
+writes to code; the code only swaps words that match, so it is idle once applied.
+
 ## Research tooling
 - `sj-lab` (dev binary) runs the core headless in software mode and plays scripts from `re/scripts/`:
   `wait`, `press`, `hold`, `mash`, `snapshot`, `save`, `load`, and `poke32 ADDR VALUE` (hex) to try a

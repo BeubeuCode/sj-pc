@@ -19,3 +19,9 @@
 0x021E6860  -   race_name_table      MTBL, entry = race id + 2
 0x021CA430  49100 demon_base_table   491 x 100 bytes; race +0x02, skills +0x2E, affinities +0x3A
 0x021428E0  4   skill_strings_file   ptr to loaded SkillStrData.mbb; names MTBL at +0x20, entry = skill id + 2
+0x0215F03C  -   render_state         +0x24 display mode (0 alternate, 1 top, 2 bottom, 3 none)
+0x021437DC  4   screen_parity        mode 0: 0 top geometry this frame, 1 bottom
+0x02051DD0  -   fn_set_display_mode  code; r0 mode
+0x020523B8  -   fn_vblank_screen_swap code; flips screen_parity, sets swap bit and capture
+0x02051FB8  -   fn_setup_top_screen  code; POWCNT1 swap on, capture to bank D
+0x020520A0  -   fn_setup_bottom_screen code; POWCNT1 swap off, capture to bank C

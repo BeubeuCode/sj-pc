@@ -20,6 +20,7 @@ pub mod settings;
 pub mod snapshot;
 pub mod stock;
 pub mod text;
+pub mod top_screen_only;
 pub mod touch;
 
 pub const NDS_SCREEN_WIDTH_PX: u32 = 256;

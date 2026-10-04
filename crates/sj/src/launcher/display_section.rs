@@ -70,6 +70,13 @@ fn show_video(ui: &mut egui::Ui, video: &mut VideoSettings) {
         ui.label("Widescreen");
         ui.checkbox(&mut video.widescreen, "16:9 3D in dungeons and battles");
         ui.end_row();
+
+        ui.label("Smooth top screen");
+        ui.checkbox(
+            &mut video.top_screen_60fps,
+            "60fps on the ship and in facilities (the hidden bottom screen stops updating)",
+        );
+        ui.end_row();
     });
 }
 

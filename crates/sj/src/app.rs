@@ -14,11 +14,12 @@ use sj_game::game_mode::{self, GameMode};
 use sj_game::input::button_mask;
 use sj_game::screen_director::{
     self, arrangement_rects, enemy_panel_rects, is_wide_frame, source_span, touch_target,
-    ScreenPlan,
+    Arrangement, Screen, ScreenPlan,
 };
 use sj_game::settings::{HotkeyAction, Settings};
 use sj_game::snapshot::{self, Snapshot};
 use sj_game::stock::read_stock;
+use sj_game::top_screen_only;
 use sj_game::touch::{bottom_screen_to_pointer, mouse_to_bottom_screen};
 
 use crate::battle_hud::{draw_unit_panels, panel_height_ds_px};
@@ -35,6 +36,8 @@ const FAST_FORWARD_FRAMES_PER_PRESENT: u32 = 4;
 const SAMPLES_DIR: &str = "re/samples";
 const DEV_PANEL_KEY: &str = "F12";
 const AUDIO_BUFFER_FRAMES: f64 = 4.0;
+// Our only cheat slot; nothing else uses the core's cheat list.
+const TOP_SCREEN_ONLY_CHEAT: u32 = 0;
 
 pub struct App {
     settings: Settings,
@@ -54,6 +57,7 @@ pub struct App {
     last_autosave: Instant,
     slot: u8,
     swapped: bool,
+    top_screen_only: Option<bool>,
     fast_forward: bool,
     running: bool,
 }
@@ -91,6 +95,7 @@ impl App {
             last_autosave: Instant::now(),
             slot: 0,
             swapped: false,
+            top_screen_only: None,
             fast_forward: false,
             running: true,
         })
@@ -185,6 +190,7 @@ impl App {
         let drawable_px = self.platform.window.drawable_size();
         let mode = game_mode::read(&self.core);
         let plan = self.plan(mode);
+        self.sync_top_screen_only(&plan);
         let screens: Vec<_> = arrangement_rects(drawable_px, &plan)
             .into_iter()
             .map(|(screen, rect)| (screen, rect, source_span(screen, &plan)))
@@ -244,6 +250,19 @@ impl App {
     // Native replacement for the game's bottom screen in battle: the panels follow the page it is on,
     // so L and R switch them as on the DS. Party status is the hero plus the stock, like the game's;
     // the Summon list is the stock. Other pages (battle results) show nothing.
+    // The game alternates its 3D between both screens in menus, facilities and the ship; while we
+    // show the top screen alone, a code patch keeps it on the top screen (sj_game::top_screen_only).
+    fn sync_top_screen_only(&mut self, plan: &ScreenPlan) {
+        let wanted = self.settings.video.top_screen_60fps
+            && plan.arrangement == Arrangement::Single(Screen::Top);
+        if self.top_screen_only == Some(wanted) {
+            return;
+        }
+        self.core
+            .set_cheat(TOP_SCREEN_ONLY_CHEAT, &top_screen_only::cheat_code(wanted));
+        self.top_screen_only = Some(wanted);
+    }
+
     fn visible_units(&self, mode: GameMode) -> Vec<UnitStatus> {
         if mode != GameMode::Battle || self.swapped || !self.settings.hud.enemy_panel {
             return Vec::new();
