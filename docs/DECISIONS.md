@@ -93,7 +93,7 @@ in the same egui pass.
 found by diffing about 90 snapshots. Public Action Replay codes supplied player, battle-unit and item
 addresses.
 
-## 017 Code patches that switch at runtime go through the cheat engine
+## 018 Code patches that switch at runtime go through the cheat engine
 melonDS's JIT keeps compiled blocks when the host writes main RAM, so a patch written through
 `GameApi` only works if the block was not compiled yet (right after a state load). Writes from the
 core's Action Replay engine go through the emulated bus, which drops compiled blocks. The

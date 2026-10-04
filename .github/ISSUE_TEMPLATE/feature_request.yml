@@ -1,0 +1,16 @@
+name: Idea or request
+description: Something the PC version should do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What you would like
+      description: Where in the game, and how it should look or behave on one screen.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What is awkward today without it.

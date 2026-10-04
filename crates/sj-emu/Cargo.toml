@@ -3,6 +3,8 @@ name = "sj-emu"
 version = "0.1.0"
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 libloading = "0.8"

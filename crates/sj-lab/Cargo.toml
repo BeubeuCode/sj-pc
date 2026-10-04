@@ -3,6 +3,8 @@ name = "sj-lab"
 version = "0.1.0"
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 sj-emu = { path = "../sj-emu" }

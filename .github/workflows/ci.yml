@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: fmt, clippy, tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      # The app crate (sj) builds SDL2 from source and needs a desktop toolchain; these crates hold
+      # the game knowledge and the emulator host, and build anywhere.
+      - run: cargo clippy -p sj-game -p sj-emu -p sj-lab --all-targets -- -D warnings
+      - run: cargo test -p sj-game -p sj-emu

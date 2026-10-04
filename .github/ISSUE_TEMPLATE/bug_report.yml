@@ -1,0 +1,47 @@
+name: Bug report
+description: Something does not work or looks wrong
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not attach ROMs, savestates, RAM dumps or game screenshots. Describe the screen in words.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to get there
+      description: Where in the game (ship, dungeon sector and floor, battle, menu) and what you pressed.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS and GPU
+      placeholder: macOS 15, Apple M2 / Windows 11, RTX 3060 / Ubuntu 24.04, Intel UHD
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit
+      description: Output of `git rev-parse --short HEAD`.
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant settings
+      description: The `[video]` and `[hud]` sections of your `sj.toml`, if you changed them.
+      render: toml
+  - type: checkboxes
+    id: no-game-data
+    attributes:
+      label: Game data
+      options:
+        - label: I did not attach anything taken from the game.
+          required: true
