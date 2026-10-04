@@ -97,6 +97,12 @@ writes to code; the code only swaps words that match, so it is idle once applied
    letterboxed main rectangle, and the bottom half into the picture-in-picture rectangle.
 4. **Throttle.** Sleep while the SDL audio queue holds more than ~4 frames of audio. Audio is the clock.
    Vsync, when on, only limits tearing.
+5. **Title.** Once a second the title shows the emulated frame rate and how often the game draws the
+   top screen (`frame_meter.rs`, from `sj_game::render_rate`: one tick of the game's main loop counter
+   is a game frame, weighted by the top screen's share of the 3D). Status messages stay 4 seconds.
+
+Moving the pointer to the top edge brings up a menu bar (`menu_bar.rs`, egui) whose "Load state" menu
+lists the autosaves and used slots, newest first, with their age.
 
 ## Video path
 The core is pinned to its `top-bottom` layout with no gap (`crates/sj/src/core_options.rs`), so every

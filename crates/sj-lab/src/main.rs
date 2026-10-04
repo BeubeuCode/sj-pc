@@ -10,6 +10,7 @@ use sj_game::image::RgbImage;
 use sj_game::input_script::{frame_masks, parse, Step};
 use sj_game::settings::load_or_default;
 use sj_game::snapshot::{self, Snapshot};
+use sj_game::top_screen_only;
 
 const SAMPLES_DIR: &str = "re/samples";
 const LAB_SAVE_DIR: &str = "re/lab-saves";
@@ -61,6 +62,9 @@ impl Lab {
             .map_err(|error| error.to_string())?;
         core.load_game(&settings.rom)
             .map_err(|error| error.to_string())?;
+        // States saved by the app on the ship can hold its top-screen patch; undo it so runs show
+        // the game as it is.
+        core.set_cheat(0, &top_screen_only::cheat_code(false));
         Ok(Self {
             core,
             last_frame: None,

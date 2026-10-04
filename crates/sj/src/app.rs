@@ -12,6 +12,7 @@ use sj_game::core_options::{core_variables, Renderer};
 use sj_game::game_api::GameApi;
 use sj_game::game_mode::{self, GameMode};
 use sj_game::input::button_mask;
+use sj_game::render_rate::{main_loop_counter, top_screen_share};
 use sj_game::screen_director::{
     self, arrangement_rects, enemy_panel_rects, is_wide_frame, source_span, touch_target,
     Arrangement, Screen, ScreenPlan,
@@ -25,8 +26,10 @@ use sj_game::touch::{bottom_screen_to_pointer, mouse_to_bottom_screen};
 use crate::battle_hud::{draw_unit_panels, panel_height_ds_px};
 use crate::capture::{encode_ppm, request_from_env, CaptureRequest};
 use crate::dev_panel::DevPanel;
+use crate::frame_meter::{FrameMeter, Reading};
 use crate::host_input::{key_input_name, pad_button_input_name, AxisThresholds, HostInput};
 use crate::hud::draw_overlays;
+use crate::menu_bar::{MenuAction, MenuBar};
 use crate::overlay::Overlay;
 use crate::platform::Platform;
 use crate::present::{read_default_framebuffer, Presenter};
@@ -36,6 +39,7 @@ const FAST_FORWARD_FRAMES_PER_PRESENT: u32 = 4;
 const SAMPLES_DIR: &str = "re/samples";
 const DEV_PANEL_KEY: &str = "F12";
 const AUDIO_BUFFER_FRAMES: f64 = 4.0;
+const STATUS_SHOWN_FOR: Duration = Duration::from_secs(4);
 // Our only cheat slot; nothing else uses the core's cheat list.
 const TOP_SCREEN_ONLY_CHEAT: u32 = 0;
 
@@ -45,6 +49,7 @@ pub struct App {
     overlay: Overlay,
     hud_texture: egui::TextureId,
     dev_panel: DevPanel,
+    menu_bar: MenuBar,
     platform: Platform,
     presenter: Presenter,
     audio: AudioQueue<i16>,
@@ -58,6 +63,10 @@ pub struct App {
     slot: u8,
     swapped: bool,
     top_screen_only: Option<bool>,
+    frame_meter: FrameMeter,
+    frame_rate: Option<Reading>,
+    status: String,
+    status_since: Instant,
     fast_forward: bool,
     running: bool,
 }
@@ -83,6 +92,7 @@ impl App {
             overlay,
             hud_texture,
             dev_panel: DevPanel::new(),
+            menu_bar: MenuBar::new(),
             platform,
             presenter,
             audio,
@@ -96,6 +106,10 @@ impl App {
             slot: 0,
             swapped: false,
             top_screen_only: None,
+            frame_meter: FrameMeter::new(Instant::now()),
+            frame_rate: None,
+            status: String::new(),
+            status_since: Instant::now(),
             fast_forward: false,
             running: true,
         })
@@ -109,6 +123,10 @@ impl App {
             self.emulate();
             self.present();
             self.throttle();
+            if let Some(reading) = self.frame_meter.take_reading(Instant::now()) {
+                self.frame_rate = Some(reading);
+                self.refresh_title();
+            }
             if self.last_autosave.elapsed() >= AUTOSAVE_INTERVAL {
                 self.autosave();
             }
@@ -145,6 +163,10 @@ impl App {
                 self.pointer(),
             );
             let mut output = self.core.run_frame();
+            self.frame_meter.record(
+                main_loop_counter(&self.core),
+                top_screen_share(&self.core, self.top_screen_only == Some(true)),
+            );
             self.apply_pending_state();
             if let Some(av_info) = output.new_av_info {
                 self.presenter.ensure_capacity(
@@ -210,13 +232,20 @@ impl App {
         let status = format!("mode: {mode:?}  swapped: {}", self.swapped);
         let ram = self.core.main_ram();
         let dev_panel = &mut self.dev_panel;
+        let menu_bar = &mut self.menu_bar;
+        let save_dir = &self.settings.save_dir;
+        let mut menu_action = None;
         self.overlay.draw(|root| {
             draw_overlays(root, &plan, frame, texture, drawable_px, margin_px);
             draw_unit_panels(root, &enemies, &enemy_rects, selected);
+            menu_action = menu_bar.show(root, save_dir);
             dev_panel.show(root, ram, &status);
         });
         self.capture_if_requested();
         self.platform.window.gl_swap_window();
+        if let Some(MenuAction::LoadState { label, path }) = menu_action {
+            self.load_state_from(&path, &label);
+        }
         self.frames_presented += 1;
     }
 
@@ -439,14 +468,18 @@ impl App {
 
     fn load_state(&mut self) {
         let path = self.current_slot_path();
-        let result = std::fs::read(&path)
+        self.load_state_from(&path, &format!("slot {}", self.slot));
+    }
+
+    fn load_state_from(&mut self, path: &Path, label: &str) {
+        let result = std::fs::read(path)
             .map_err(|error| error.to_string())
             .and_then(|state| {
                 self.core
                     .load_state(&state)
                     .map_err(|error| error.to_string())
             });
-        self.update_title(&status_text("loaded", &result));
+        self.update_title(&status_text(&format!("loaded {label}"), &result));
     }
 
     fn take_snapshot(&mut self) {
@@ -491,14 +524,34 @@ impl App {
         slot_path(&self.settings.save_dir, self.slot)
     }
 
+    // A non-empty status ("(saved)") shows for a few seconds; the frame rate refreshes every second.
     fn update_title(&mut self, status: &str) {
+        if !status.is_empty() {
+            self.status = status.to_string();
+            self.status_since = Instant::now();
+        }
+        self.refresh_title();
+    }
+
+    fn refresh_title(&mut self) {
         let fast_forward = if self.fast_forward {
             " - fast forward"
         } else {
             ""
         };
+        let frame_rate = self.frame_rate.map_or(String::new(), |reading| {
+            format!(
+                " - {} fps, top screen {}",
+                reading.emulated_fps, reading.top_screen_fps
+            )
+        });
+        let status = if self.status_since.elapsed() < STATUS_SHOWN_FOR {
+            self.status.as_str()
+        } else {
+            ""
+        };
         let title = format!(
-            "Strange Journey - slot {}{fast_forward} {status}",
+            "Strange Journey - slot {}{frame_rate}{fast_forward} {status}",
             self.slot
         );
         let _ = self.platform.window.set_title(title.trim_end());

@@ -10,6 +10,15 @@ pub const SCENE_FLAGS: Arm9Addr = Arm9Addr(0x0216_AB60);
 pub const SCENE_UPDATE_FN_OFFSET: u32 = 0x08;
 pub const DUNGEON_SCENE_UPDATE_FN: u32 = 0x0203_034C;
 
+// Render state. Display mode: 0 the 3D alternates between the screens (menus, facilities, the ship;
+// 30fps each), 1 top screen only (battles, dungeons), 2 bottom only, 3 none; set by 0x02051DD0.
+// The main loop counter advances once per game frame, so it stalls when the game lags.
+pub const RENDER_STATE: Arm9Addr = Arm9Addr(0x0215_F03C);
+pub const RENDER_DISPLAY_MODE_OFFSET: u32 = 0x24;
+pub const RENDER_MAIN_LOOP_COUNTER_OFFSET: u32 = 0x38;
+pub const DISPLAY_MODE_ALTERNATE: u32 = 0;
+pub const DISPLAY_MODE_TOP_ONLY: u32 = 1;
+
 // Message window object: non-null while a dialogue box is on screen (ship and dungeon alike).
 pub const MESSAGE_WINDOW: Arm9Addr = Arm9Addr(0x0216_B9AC);
 

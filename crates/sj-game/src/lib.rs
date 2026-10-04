@@ -14,6 +14,7 @@ pub mod patch;
 pub mod png;
 pub mod ram_search;
 pub mod rect;
+pub mod render_rate;
 pub mod rom;
 pub mod screen_director;
 pub mod settings;
