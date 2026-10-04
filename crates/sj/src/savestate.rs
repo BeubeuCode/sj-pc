@@ -43,15 +43,20 @@ pub fn saved_states(save_dir: &Path, now: SystemTime) -> Vec<SavedState> {
     .chain((0..SLOT_COUNT).map(|slot| (format!("Slot {slot}"), slot_path(save_dir, slot))));
     let mut states: Vec<SavedState> = candidates
         .filter_map(|(label, path)| {
-            let modified = std::fs::metadata(&path)
-                .and_then(|meta| meta.modified())
-                .ok()?;
-            let age = now.duration_since(modified).unwrap_or_default();
+            let age = file_age(&path, now)?;
             Some(SavedState { label, path, age })
         })
         .collect();
     states.sort_by_key(|state| state.age);
     states
+}
+
+// None when the file does not exist.
+pub fn file_age(path: &Path, now: SystemTime) -> Option<Duration> {
+    let modified = std::fs::metadata(path)
+        .and_then(|meta| meta.modified())
+        .ok()?;
+    Some(now.duration_since(modified).unwrap_or_default())
 }
 
 pub fn age_text(age: Duration) -> String {

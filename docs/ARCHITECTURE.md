@@ -101,8 +101,9 @@ writes to code; the code only swaps words that match, so it is idle once applied
    top screen (`frame_meter.rs`, from `sj_game::render_rate`: one tick of the game's main loop counter
    is a game frame, weighted by the top screen's share of the 3D). Status messages stay 4 seconds.
 
-Moving the pointer to the top edge brings up a menu bar (`menu_bar.rs`, egui) whose "Load state" menu
-lists the autosaves and used slots, newest first, with their age.
+Moving the pointer to the top edge brings up a menu bar (`menu_bar.rs`, egui). "Load state" lists the
+autosaves and used slots, newest first, with their age; "Save state" lists the ten slots and makes the
+chosen one the current slot.
 
 ## Video path
 The core is pinned to its `top-bottom` layout with no gap (`crates/sj/src/core_options.rs`), so every

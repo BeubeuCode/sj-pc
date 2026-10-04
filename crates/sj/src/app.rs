@@ -243,8 +243,13 @@ impl App {
         });
         self.capture_if_requested();
         self.platform.window.gl_swap_window();
-        if let Some(MenuAction::LoadState { label, path }) = menu_action {
-            self.load_state_from(&path, &label);
+        match menu_action {
+            Some(MenuAction::LoadState { label, path }) => self.load_state_from(&path, &label),
+            Some(MenuAction::SaveState { slot }) => {
+                self.slot = slot;
+                self.save_state();
+            }
+            None => {}
         }
         self.frames_presented += 1;
     }

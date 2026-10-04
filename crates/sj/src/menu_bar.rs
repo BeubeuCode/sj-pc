@@ -1,13 +1,14 @@
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-use crate::savestate::{age_text, saved_states};
+use crate::savestate::{age_text, file_age, saved_states, slot_path, SLOT_COUNT};
 
 // How close to the top edge, in points, the pointer has to be to bring the bar up.
 const REVEAL_ZONE_PT: f32 = 28.0;
 
 pub enum MenuAction {
     LoadState { label: String, path: PathBuf },
+    SaveState { slot: u8 },
 }
 
 // A menu bar that stays out of the game's way: it appears while the pointer is at the top edge
@@ -33,14 +34,29 @@ impl MenuBar {
         let bar = egui::Panel::top("menu_bar").show(root, |ui| {
             egui::MenuBar::new()
                 .ui(ui, |ui| {
-                    ui.menu_button("Load state", |ui| action = load_state_menu(ui, save_dir))
-                        .inner
+                    let load = ui.menu_button("Load state", |ui| load_state_menu(ui, save_dir));
+                    let save = ui.menu_button("Save state", |ui| save_state_menu(ui, save_dir));
+                    let open = load.inner.is_some() || save.inner.is_some();
+                    action = load.inner.flatten().or(save.inner.flatten());
+                    open
                 })
                 .inner
         });
-        self.menu_open = bar.inner.is_some();
+        self.menu_open = bar.inner;
         action
     }
+}
+
+fn save_state_menu(ui: &mut egui::Ui, save_dir: &Path) -> Option<MenuAction> {
+    let now = SystemTime::now();
+    for slot in 0..SLOT_COUNT {
+        let age = file_age(&slot_path(save_dir, slot), now).map_or("empty".to_string(), age_text);
+        if ui.button(format!("Slot {slot}  ·  {age}")).clicked() {
+            ui.close();
+            return Some(MenuAction::SaveState { slot });
+        }
+    }
+    None
 }
 
 fn load_state_menu(ui: &mut egui::Ui, save_dir: &Path) -> Option<MenuAction> {
