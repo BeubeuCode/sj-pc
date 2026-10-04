@@ -39,6 +39,10 @@ description: Nintendo DS reverse-engineering and libretro-host knowledge for the
   or clicks land at half their position. The future F1 menu needs the same treatment.
 - `RETRO_MEMORY_SYSTEM_RAM` returns null while the core shows its own error screen. `GameApi` then yields an empty slice.
 
+- Controllers: the launcher's Controls section lists connected pads and the last pad input received.
+  Use it first when a controller "doesn't work": it tells detection problems from input problems.
+  On macOS, Xbox pads go through Apple's driver (docs/DECISIONS.md 013).
+
 ## Build gotchas
 - Homebrew rustup is keg-only: `export PATH="/opt/homebrew/opt/rustup/bin:$PATH"`.
 - CMake 4 needs `CMAKE_POLICY_VERSION_MINIMUM=3.5` for the bundled SDL2. It is set in `.cargo/config.toml`.

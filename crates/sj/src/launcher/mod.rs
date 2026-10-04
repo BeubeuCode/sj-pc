@@ -15,7 +15,7 @@ use crate::capture::{encode_ppm, request_from_env};
 use crate::host_input::AxisThresholds;
 use crate::platform::Platform;
 use crate::present::read_default_framebuffer;
-use binding_capture::{apply_capture, captured_input};
+use binding_capture::{apply_capture, captured_input, Captured};
 use mouse_points::mouse_event_in_drawable_pixels;
 use state::{LauncherState, Outcome};
 
@@ -73,10 +73,15 @@ fn handle_event(
         Event::ControllerDeviceRemoved { which, .. } => platform.close_controller(*which),
         _ => {}
     }
+    state.controller_names = platform.controller_names();
+    let thresholds =
+        AxisThresholds::from_deadzone_percent(state.settings.controller.stick_deadzone_percent);
+    let captured = captured_input(event, thresholds);
+    if let Some(Captured::Pad(name)) = &captured {
+        state.last_pad_input = Some(name.clone());
+    }
     if let Some(target) = state.capture {
-        let thresholds =
-            AxisThresholds::from_deadzone_percent(state.settings.controller.stick_deadzone_percent);
-        if let Some(captured) = captured_input(event, thresholds) {
+        if let Some(captured) = captured {
             if apply_capture(&mut state.settings, target, captured) {
                 state.capture = None;
             }

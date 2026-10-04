@@ -57,3 +57,10 @@ the launcher from the game is deliberately not supported. In-game changes will c
 ## 012 ROM is picked by path field and drag-and-drop
 No native file dialog, because that would need GTK or desktop-portal libraries on Linux.
 Revisit if friends find typing paths painful.
+
+## 013 On macOS, Xbox controllers use Apple's GameController driver
+The bundled SDL (2.26) reads Bluetooth Xbox controllers through its own HID driver, which falls behind
+Microsoft firmware updates. A Series controller on firmware 5.23 connected but delivered no input when
+rebinding. `Platform::new` sets `SDL_JOYSTICK_HIDAPI_XBOX=0` on macOS, so SDL uses Apple's framework
+instead. Apple tracks the firmware and no Input Monitoring permission is needed. Linux and Windows are
+unchanged. Revisit when we move to a newer SDL.

@@ -18,6 +18,7 @@ pub struct Platform {
 
 impl Platform {
     pub fn new(window_width_px: u32, window_height_px: u32) -> Result<Self, String> {
+        prefer_native_xbox_driver_on_macos();
         let sdl = sdl2::init()?;
         let video = sdl.video()?;
         configure_gl_attributes(&video);
@@ -87,12 +88,24 @@ impl Platform {
             .retain(|controller| controller.instance_id() != instance_id);
     }
 
+    pub fn controller_names(&self) -> Vec<String> {
+        self.controllers.iter().map(GameController::name).collect()
+    }
+
     pub fn to_drawable(&self, window_x: i32, window_y: i32) -> (i32, i32) {
         let (window_width, window_height) = self.window.size();
         let (drawable_width, drawable_height) = self.window.drawable_size();
         let x = i64::from(window_x) * i64::from(drawable_width) / i64::from(window_width.max(1));
         let y = i64::from(window_y) * i64::from(drawable_height) / i64::from(window_height.max(1));
         (x as i32, y as i32)
+    }
+}
+
+// SDL's own HID driver for Bluetooth Xbox controllers lags behind Microsoft firmware updates.
+// Apple's GameController framework tracks them and needs no Input Monitoring permission.
+fn prefer_native_xbox_driver_on_macos() {
+    if cfg!(target_os = "macos") {
+        sdl2::hint::set("SDL_JOYSTICK_HIDAPI_XBOX", "0");
     }
 }
 

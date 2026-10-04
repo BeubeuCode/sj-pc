@@ -8,10 +8,17 @@ use super::binding_capture::CaptureTarget;
 
 const WAITING_TEXT: &str = "Press a key or controller button… (Esc cancels)";
 
-pub fn show(ui: &mut egui::Ui, settings: &mut Settings, capture: &mut Option<CaptureTarget>) {
+pub fn show(
+    ui: &mut egui::Ui,
+    settings: &mut Settings,
+    capture: &mut Option<CaptureTarget>,
+    controller_names: &[String],
+    last_pad_input: Option<&str>,
+) {
     egui::CollapsingHeader::new("Controls")
         .default_open(true)
         .show(ui, |ui| {
+            show_controllers(ui, controller_names, last_pad_input);
             ui.add(
                 egui::Slider::new(
                     &mut settings.controller.stick_deadzone_percent,
@@ -32,6 +39,20 @@ pub fn show(ui: &mut egui::Ui, settings: &mut Settings, capture: &mut Option<Cap
                 *capture = None;
             }
         });
+}
+
+fn show_controllers(ui: &mut egui::Ui, controller_names: &[String], last_pad_input: Option<&str>) {
+    ui.horizontal(|ui| {
+        ui.label(RichText::new("Controllers").strong());
+        if controller_names.is_empty() {
+            ui.colored_label(Color32::LIGHT_RED, "none connected");
+            return;
+        }
+        ui.colored_label(Color32::LIGHT_GREEN, controller_names.join(", "));
+        let last_input =
+            last_pad_input.map_or_else(|| "press any button to test".to_string(), display_name);
+        ui.label(format!("· last input: {last_input}"));
+    });
 }
 
 fn show_button_bindings(

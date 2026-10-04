@@ -21,6 +21,8 @@ pub struct LauncherState {
     pub core_text: String,
     pub rom_status: RomStatus,
     pub capture: Option<CaptureTarget>,
+    pub controller_names: Vec<String>,
+    pub last_pad_input: Option<String>,
     pub message: Option<String>,
     pub outcome: Option<Outcome>,
 }
@@ -36,6 +38,8 @@ impl LauncherState {
             settings_path: settings_path.to_path_buf(),
             rom_status,
             capture: None,
+            controller_names: Vec::new(),
+            last_pad_input: None,
             message,
             outcome: None,
         }
@@ -70,7 +74,13 @@ impl LauncherState {
                 game_section::show(ui, self);
                 display_section::show(ui, &mut self.settings.video, &mut self.settings.pip);
                 sound_section::show(ui, &mut self.settings.audio);
-                controls_section::show(ui, &mut self.settings, &mut self.capture);
+                controls_section::show(
+                    ui,
+                    &mut self.settings,
+                    &mut self.capture,
+                    &self.controller_names,
+                    self.last_pad_input.as_deref(),
+                );
             });
         });
     }
@@ -86,11 +96,13 @@ impl LauncherState {
                 self.save_settings();
             }
             if ui.button("Reset all to defaults").clicked() {
+                let controller_names = std::mem::take(&mut self.controller_names);
                 *self = Self::new(
                     Settings::default(),
                     &self.settings_path,
                     Some("Defaults restored, not saved yet.".into()),
                 );
+                self.controller_names = controller_names;
             }
             if ui.button("Quit").clicked() {
                 self.outcome = Some(Outcome::Quit);
