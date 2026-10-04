@@ -39,10 +39,10 @@ capture and the game, so a binding captured in the launcher always matches in ga
 ## Screen director
 Each frame the app reads the game mode (`sj_game::game_mode`, from the scene flags at `0x0216AB60`)
 and asks `sj_game::screen_director::plan` what to show:
-- **3D field (`0x0400`):** top screen fills the view. The minimap (automap cropped from the bottom
-  screen, anchored to the corner of the game image) is off until a dungeon snapshot shows which mode
-  carries the automap: every `0x0400` sample so far is a ship scene with an empty map.
-- **Ship rooms (facility):** top screen only. Rooms are picked from a menu, so the room map is no use
+- **Dungeon** (scene flags `0x0000` like the title, plus the dungeon bit at `0x0216B44C`): top screen
+  fills the view, with the automap cropped from the bottom screen as a minimap below the game's
+  header bar. It hides while a dialogue box is open (`0x0216B9AC` non-null).
+- **Ship scenes (`0x0400`)** and **ship rooms (facility):** top screen only. Rooms are picked from a menu, so the room map is no use
   and would cover character portraits.
 - **Menus, mission log, title, name entry, unknown modes:** both screens side by side, because the game splits these screens between detail (top) and list (bottom).
 - **Cinematics:** top screen only.

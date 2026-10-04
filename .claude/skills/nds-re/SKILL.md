@@ -17,7 +17,9 @@ description: Nintendo DS reverse-engineering and libretro-host knowledge for the
 
 ## Known addresses
 `crates/sj-game/src/addresses.rs` is the code's source of truth; `docs/re/MEMORY_MAP.md` explains each.
-Highlights: scene flags `0x0216AB60` (game mode), player HP/MP `0x022142F8`. Public cheat codes for BMTE
+Highlights: scene flags `0x0216AB60` (game mode), player HP/MP `0x022142F8`, dungeon bit `0x10` at
+`0x0216B44C`, dialogue window `0x0216B9AC`. Scene flags alone confuse the title with dungeons (both
+`0x0000`). Public cheat codes for BMTE
 are already mined (`docs/re/README.md`); check them before hunting, and confirm any cheat address in a
 snapshot before trusting it.
 

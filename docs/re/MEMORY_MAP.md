@@ -44,6 +44,8 @@ Found with `sj-lab` snapshots (see `re/scripts/`) and public Action Replay codes
 | `0x0221468F` | u8 ×0x39 | Expendable item counts | AR codes | high |
 | `0x022159F2 + n×0x24` | u16 | Compendium entry field, 491 entries | AR codes | medium |
 | `0x0216AB60` | u16 | Scene flags, one bit per top-level scene, see `game_mode.rs` | diff of all lab samples | high |
+| `0x0216B44C` | u32 | Area flags; bit `0x10` set in dungeons (battles there too), else `0x01` | 5 dungeon snapshots | medium |
+| `0x0216B9AC` | ptr | Message window object, non-null while a dialogue box is open | ship + dungeon dialogue, 35 snapshots, one mislabel | high |
 | `0x02222700` | u16 ×8 | First-name edit buffer during Name Entry (heap) | diff during Name Entry | high |
 | `0x02222680` | u16 ×8 | Last-name edit buffer during Name Entry (heap) | same | high |
 | — | — | dungeon camera projection call site | Phase D target, see `WIDESCREEN.md` | — |

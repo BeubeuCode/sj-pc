@@ -1,5 +1,5 @@
-use crate::addresses::SCENE_FLAGS;
-use crate::game_api::{read_u16, GameApi};
+use crate::addresses::{AREA_FLAGS, AREA_FLAG_DUNGEON, MESSAGE_WINDOW, SCENE_FLAGS};
+use crate::game_api::{read_u16, read_u32, GameApi};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameMode {
@@ -7,6 +7,7 @@ pub enum GameMode {
     Facility,
     TextEntry,
     ShipScene,
+    Dungeon { dialogue: bool },
     Menu,
     Event,
     MissionLog,
@@ -27,7 +28,13 @@ pub fn decode(scene_flags: u16) -> GameMode {
 }
 
 pub fn read(game: &dyn GameApi) -> GameMode {
-    read_u16(game, SCENE_FLAGS).map_or(GameMode::Unknown(0xFFFF), decode)
+    let mode = read_u16(game, SCENE_FLAGS).map_or(GameMode::Unknown(0xFFFF), decode);
+    let in_dungeon = read_u32(game, AREA_FLAGS).is_some_and(|flags| flags & AREA_FLAG_DUNGEON != 0);
+    if mode != GameMode::Title || !in_dungeon {
+        return mode;
+    }
+    let dialogue = read_u32(game, MESSAGE_WINDOW).is_some_and(|window| window != 0);
+    GameMode::Dungeon { dialogue }
 }
 
 #[cfg(test)]
@@ -58,5 +65,15 @@ mod tests {
         let mut game = FakeGame::default();
         put_u32(&mut game, SCENE_FLAGS, 0x0400);
         assert_eq!(read(&game), GameMode::ShipScene);
+    }
+
+    #[test]
+    fn dungeon_shares_the_title_flags_but_sets_the_area_bit() {
+        let mut game = FakeGame::default();
+        assert_eq!(read(&game), GameMode::Title);
+        put_u32(&mut game, AREA_FLAGS, 0x11);
+        assert_eq!(read(&game), GameMode::Dungeon { dialogue: false });
+        put_u32(&mut game, MESSAGE_WINDOW, 0x0229_DF84);
+        assert_eq!(read(&game), GameMode::Dungeon { dialogue: true });
     }
 }

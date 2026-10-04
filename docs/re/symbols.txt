@@ -8,5 +8,7 @@
 0x0221434C  1   alignment            0 law, 0x80 neutral, 0xFF chaos
 0x02214620  4   macca
 0x0221463C  1   moon_phase
+0x0216B44C  4   area_flags           bit 0x10 = dungeon
+0x0216B9AC  4   message_window       non-null while a dialogue box is open
 0x0202FDD4  -   fn_wall_collision    code; r6/r7 tile coords
 0x02036610  -   fn_encounter_gauge   code; s16 at [r4+0xAF2]

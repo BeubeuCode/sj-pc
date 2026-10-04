@@ -92,7 +92,7 @@ pub fn plan(mode: GameMode, swapped: bool, hud: &HudSettings, pip: &PipSettings)
 
 fn arrangement_for(mode: GameMode) -> Arrangement {
     match mode {
-        GameMode::Facility | GameMode::ShipScene | GameMode::Event => {
+        GameMode::Facility | GameMode::ShipScene | GameMode::Dungeon { .. } | GameMode::Event => {
             Arrangement::Single(Screen::Top)
         }
         GameMode::Title
@@ -103,11 +103,10 @@ fn arrangement_for(mode: GameMode) -> Arrangement {
     }
 }
 
-// ponytail: off everywhere for now. Ship rooms are picked from a menu, and every 0x0400 sample so far
-// is a ship scene with an empty grid on the bottom screen, so the minimap only covered portraits.
-// Turn it back on for the mode a dungeon snapshot shows the automap in.
-fn shows_automap(_mode: GameMode) -> bool {
-    false
+// Only dungeons have an automap worth showing, and it hides while someone talks so it never covers
+// a portrait.
+fn shows_automap(mode: GameMode) -> bool {
+    mode == GameMode::Dungeon { dialogue: false }
 }
 
 fn minimap_overlay(hud: &HudSettings) -> Overlay {
@@ -154,6 +153,10 @@ pub fn arrangement_rects(window_px: (u32, u32), arrangement: Arrangement) -> Vec
     }
 }
 
+// The game's own status bar across the top of the top screen (moon phase, SEARCH, ANALYZE). HUD
+// pieces start below it so they never hide it.
+pub const GAME_HEADER_DS_PX: f32 = 24.0;
+
 // Overlays only exist over a single screen, so they anchor to that screen's image, not the
 // window: otherwise they hang off the image onto the pillarbox bars.
 pub fn overlay_rect(window_px: (u32, u32), overlay: &Overlay, margin_px: u32) -> RectPx {
@@ -167,9 +170,15 @@ pub fn overlay_rect(window_px: (u32, u32), overlay: &Overlay, margin_px: u32) ->
         overlay.corner,
         margin_px,
     );
+    let header_px = match overlay.corner {
+        Corner::TopLeft | Corner::TopRight => {
+            (GAME_HEADER_DS_PX * screen.height as f32 / NDS_SCREEN_HEIGHT_PX as f32).round() as i32
+        }
+        Corner::BottomLeft | Corner::BottomRight => 0,
+    };
     RectPx {
         x: screen.x + in_screen.x,
-        y: screen.y + in_screen.y,
+        y: screen.y + in_screen.y + header_px,
         ..in_screen
     }
 }
@@ -222,7 +231,7 @@ mod tests {
     #[test]
     fn swap_shows_the_bottom_screen_alone() {
         let plan = plan(
-            GameMode::ShipScene,
+            GameMode::Dungeon { dialogue: false },
             true,
             &HudSettings::default(),
             &no_pip(),
@@ -265,8 +274,31 @@ mod tests {
     }
 
     #[test]
-    fn ship_scenes_show_the_top_screen_without_a_minimap() {
-        for mode in [GameMode::Facility, GameMode::ShipScene] {
+    fn exploring_a_dungeon_shows_the_top_screen_with_a_minimap() {
+        let mode = GameMode::Dungeon { dialogue: false };
+        let plan = plan(mode, false, &HudSettings::default(), &no_pip());
+        assert_eq!(plan.arrangement, Arrangement::Single(Screen::Top));
+        assert_eq!(plan.overlays.len(), 1);
+        assert_eq!(plan.overlays[0].crop, AUTOMAP_CROP);
+    }
+
+    #[test]
+    fn minimap_can_be_turned_off() {
+        let hud = HudSettings {
+            minimap: false,
+            ..HudSettings::default()
+        };
+        let mode = GameMode::Dungeon { dialogue: false };
+        assert_eq!(plan(mode, false, &hud, &no_pip()).overlays, []);
+    }
+
+    #[test]
+    fn ship_scenes_and_dialogue_show_the_top_screen_without_a_minimap() {
+        for mode in [
+            GameMode::Facility,
+            GameMode::ShipScene,
+            GameMode::Dungeon { dialogue: true },
+        ] {
             let plan = plan(mode, false, &HudSettings::default(), &no_pip());
             assert_eq!(plan.arrangement, Arrangement::Single(Screen::Top));
             assert_eq!(plan.overlays, []);
@@ -274,15 +306,16 @@ mod tests {
     }
 
     #[test]
-    fn minimap_sits_in_the_corner_of_the_game_image_not_the_window() {
+    fn minimap_sits_in_the_image_corner_below_the_game_header() {
         let overlay = minimap_overlay(&HudSettings::default());
         let rect = overlay_rect((1920, 1080), &overlay, 16);
         let image_right_px = 240 + 1440;
+        let header_px = 135;
         assert_eq!(
             rect,
             RectPx {
                 x: image_right_px - 16 - 518,
-                y: 16,
+                y: 16 + header_px,
                 width: 518,
                 height: 324
             }
@@ -302,7 +335,7 @@ mod tests {
             })
         );
         let field = plan(
-            GameMode::ShipScene,
+            GameMode::Dungeon { dialogue: false },
             false,
             &HudSettings::default(),
             &no_pip(),
@@ -312,7 +345,12 @@ mod tests {
             visible: true,
             ..PipSettings::default()
         };
-        let with_pip = plan(GameMode::ShipScene, false, &HudSettings::default(), &pip);
+        let with_pip = plan(
+            GameMode::Dungeon { dialogue: false },
+            false,
+            &HudSettings::default(),
+            &pip,
+        );
         assert!(touch_target((1920, 1080), &with_pip, 16).is_some());
     }
 }
