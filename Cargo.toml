@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/sj-game"]
+members = ["crates/sj-game", "crates/sj-emu"]
 
 [workspace.package]
 edition = "2021"
