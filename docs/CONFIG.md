@@ -74,6 +74,10 @@ Click or drag inside the overlay with the left mouse button to touch the screen.
 
 The current slot (0 to 9) shows in the window title. Slots are `saves/slot<N>.state`.
 
+The game also autosaves every 5 minutes and on quit to `saves/autosave.state`, keeping the one before
+as `saves/autosave.previous.state`. It skips the title screen, so quitting right after launch never
+replaces a real session. The launcher's "Resume last session" starts from the autosave.
+
 ## `[bindings]`
 Each DS button maps to a list of inputs. Any one of them presses the button. In the launcher,
 click **+ Add** and press a key or controller input to bind it, and click a binding to remove it.

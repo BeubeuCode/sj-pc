@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::event::Event;
@@ -23,7 +23,7 @@ use crate::hud::draw_overlays;
 use crate::overlay::Overlay;
 use crate::platform::Platform;
 use crate::present::{read_default_framebuffer, Presenter};
-use crate::savestate::{next_slot, previous_slot, slot_path};
+use crate::savestate::{next_slot, previous_slot, slot_path, write_autosave, AUTOSAVE_INTERVAL};
 
 const FAST_FORWARD_FRAMES_PER_PRESENT: u32 = 4;
 const SAMPLES_DIR: &str = "re/samples";
@@ -45,6 +45,7 @@ pub struct App {
     capture: Option<CaptureRequest>,
     frames_presented: u64,
     pending_state: Option<Vec<u8>>,
+    last_autosave: Instant,
     slot: u8,
     swapped: bool,
     fast_forward: bool,
@@ -81,6 +82,7 @@ impl App {
             capture: request_from_env(),
             frames_presented: 0,
             pending_state: None,
+            last_autosave: Instant::now(),
             slot: 0,
             swapped: false,
             fast_forward: false,
@@ -96,7 +98,28 @@ impl App {
             self.emulate();
             self.present();
             self.throttle();
+            if self.last_autosave.elapsed() >= AUTOSAVE_INTERVAL {
+                self.autosave();
+            }
         }
+        self.autosave();
+    }
+
+    // Skipped on the title screen so quitting right after launch cannot replace a real session,
+    // and during frame captures so test runs never touch the player's autosave.
+    fn autosave(&mut self) {
+        self.last_autosave = Instant::now();
+        if self.capture.is_some() || game_mode::read(&self.core) == GameMode::Title {
+            return;
+        }
+        let result = self
+            .core
+            .save_state()
+            .map_err(|error| error.to_string())
+            .and_then(|state| {
+                write_autosave(&self.settings.save_dir, &state).map_err(|error| error.to_string())
+            });
+        self.update_title(&status_text("autosaved", &result));
     }
 
     fn emulate(&mut self) {

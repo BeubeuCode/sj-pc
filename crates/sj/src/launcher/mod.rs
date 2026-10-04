@@ -5,7 +5,7 @@ mod game_section;
 mod sound_section;
 mod state;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use sdl2::event::Event;
 use sj_game::settings::Settings;
@@ -15,6 +15,7 @@ use crate::host_input::AxisThresholds;
 use crate::overlay::Overlay;
 use crate::platform::Platform;
 use crate::present::read_default_framebuffer;
+use crate::savestate::autosave_path;
 use binding_capture::{apply_capture, captured_input, Captured};
 use state::{LauncherState, Outcome};
 
@@ -25,7 +26,7 @@ pub fn run(
     settings: Settings,
     settings_path: &Path,
     message: Option<String>,
-) -> Option<(Platform, Settings)> {
+) -> Option<(Platform, Settings, Option<PathBuf>)> {
     let _ = platform.window.set_title("Strange Journey - Launcher");
     let mut overlay = Overlay::new(&platform);
     let mut state = LauncherState::new(settings, settings_path, message);
@@ -53,7 +54,11 @@ pub fn run(
     }
     drop(overlay);
     match state.outcome {
-        Some(Outcome::Play) => Some((platform, state.settings)),
+        Some(Outcome::Play) => Some((platform, state.settings, None)),
+        Some(Outcome::Resume) => {
+            let start_state = autosave_path(&state.settings.save_dir);
+            Some((platform, state.settings, Some(start_state)))
+        }
         _ => None,
     }
 }

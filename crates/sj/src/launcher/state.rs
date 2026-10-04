@@ -6,10 +6,12 @@ use sj_game::settings::{save, Settings};
 
 use super::binding_capture::CaptureTarget;
 use super::{controls_section, display_section, game_section, sound_section};
+use crate::savestate::autosave_path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Outcome {
     Play,
+    Resume,
     Quit,
 }
 
@@ -95,7 +97,16 @@ impl LauncherState {
         ui.horizontal(|ui| {
             let play = egui::Button::new(RichText::new("  Play  ").size(18.0).strong());
             if ui.add_enabled(self.ready_to_play(), play).clicked() {
-                self.play();
+                self.finish(Outcome::Play);
+            }
+            let can_resume =
+                self.ready_to_play() && autosave_path(&self.settings.save_dir).is_file();
+            if ui
+                .add_enabled(can_resume, egui::Button::new("Resume last session"))
+                .on_hover_text("Starts from the autosave taken every 5 minutes and on quit")
+                .clicked()
+            {
+                self.finish(Outcome::Resume);
             }
             if ui.button("Save settings").clicked() {
                 self.save_settings();
@@ -119,9 +130,9 @@ impl LauncherState {
         ui.add_space(6.0);
     }
 
-    fn play(&mut self) {
+    fn finish(&mut self, outcome: Outcome) {
         if self.save_settings() {
-            self.outcome = Some(Outcome::Play);
+            self.outcome = Some(outcome);
         }
     }
 

@@ -21,7 +21,7 @@ Status legend: `done`, `in progress`, `todo`.
 - [x] `sj-game`: settings, layout math, touch mapping, input mapping, patch engine
 - [x] `sj-emu`: load core, environment/video/audio/input callbacks, savestates, main RAM via `GameApi`
 - [x] `sj`: SDL window, OpenGL presentation at 1-8x, controller hot-plug, audio-clocked pacing
-- [x] savestates (10 slots) and fast-forward
+- [x] savestates (10 slots), autosave every 5 minutes and on quit, fast-forward
 - [x] ROM boots to the intro screens (verified by capture and by the ROM smoke test)
 - [ ] hands-on play-test: controller feel, touch accuracy, savestates mid-dungeon
 - [ ] build and run on Linux and Windows

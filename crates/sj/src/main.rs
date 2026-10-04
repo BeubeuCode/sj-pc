@@ -10,7 +10,7 @@ mod platform;
 mod present;
 mod savestate;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use crate::platform::Platform;
@@ -47,8 +47,8 @@ fn run() -> Result<(), String> {
         settings.video.window_width_px,
         settings.video.window_height_px,
     )?;
-    let (platform, settings) = if skip_launcher {
-        (platform, settings)
+    let (platform, settings, resume_state) = if skip_launcher {
+        (platform, settings, None)
     } else {
         match launcher::run(platform, settings, settings_path, load_problem) {
             Some(chosen) => chosen,
@@ -56,8 +56,9 @@ fn run() -> Result<(), String> {
         }
     };
     let mut app = app::App::new(platform, settings)?;
-    if let Some(state_path) = flag_value(START_STATE_FLAG) {
-        app.load_state_file(Path::new(&state_path))?;
+    let flag_state = flag_value(START_STATE_FLAG).map(PathBuf::from);
+    if let Some(state_path) = resume_state.or(flag_state) {
+        app.load_state_file(&state_path)?;
     }
     app.run();
     Ok(())
