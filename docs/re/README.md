@@ -36,3 +36,10 @@
 - `MEMORY_MAP.md`: what lives where.
 - `WIDESCREEN.md`: the projection patch plan.
 - `symbols.txt`: one line per known symbol.
+
+## Public sources already mined
+- melonDS cheat file for BMTE (DeadSkullzJr database mirror):
+  https://github.com/Lyrx997/MelonDS-Desktop-Cheats
+- Codejunkies USA codes: http://dscodesaction.blogspot.com/2010/03/shin-megami-tensei-strange-journey.html
+- Opening walkthrough: https://lparchive.org/Shin-Megami-Tensei-Strange-Journey-(by-Dragonatrix)/
+No public RAM map exists for position, automap, scene state or text buffers; those come from the lab.

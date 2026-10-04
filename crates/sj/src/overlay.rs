@@ -27,6 +27,10 @@ impl Overlay {
         self.egui.ctx.egui_wants_pointer_input() || self.egui.ctx.is_pointer_over_egui()
     }
 
+    pub fn register_native_texture(&mut self, texture: glow::Texture) -> egui::TextureId {
+        self.egui.painter.register_native_texture(texture)
+    }
+
     pub fn clear(&self, rgba: [f32; 4]) {
         self.egui.clear(rgba);
     }

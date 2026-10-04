@@ -64,18 +64,21 @@ pub type Bindings = BTreeMap<NdsButton, Vec<String>>;
 
 pub fn default_bindings() -> Bindings {
     let pairs: [(NdsButton, &[&str]); 12] = [
-        (NdsButton::A, &["X", "pad:a"]),
-        (NdsButton::B, &["Z", "pad:b"]),
-        (NdsButton::X, &["S", "pad:y"]),
-        (NdsButton::Y, &["A", "pad:x"]),
+        (NdsButton::A, &["Return", "Space", "pad:a"]),
+        (NdsButton::B, &["Backspace", "pad:b"]),
+        (NdsButton::X, &["Tab", "pad:x"]),
+        (NdsButton::Y, &["Escape", "pad:y"]),
         (NdsButton::L, &["Q", "pad:leftshoulder"]),
-        (NdsButton::R, &["W", "pad:rightshoulder"]),
-        (NdsButton::Start, &["Return", "pad:start"]),
-        (NdsButton::Select, &["Right Shift", "pad:back"]),
-        (NdsButton::Up, &["Up", "pad:dpup", "pad:lefty-"]),
-        (NdsButton::Down, &["Down", "pad:dpdown", "pad:lefty+"]),
-        (NdsButton::Left, &["Left", "pad:dpleft", "pad:leftx-"]),
-        (NdsButton::Right, &["Right", "pad:dpright", "pad:leftx+"]),
+        (NdsButton::R, &["E", "pad:rightshoulder"]),
+        (NdsButton::Start, &["F", "pad:start"]),
+        (NdsButton::Select, &["C", "pad:back"]),
+        (NdsButton::Up, &["W", "Up", "pad:dpup", "pad:lefty-"]),
+        (NdsButton::Down, &["S", "Down", "pad:dpdown", "pad:lefty+"]),
+        (NdsButton::Left, &["A", "Left", "pad:dpleft", "pad:leftx-"]),
+        (
+            NdsButton::Right,
+            &["D", "Right", "pad:dpright", "pad:leftx+"],
+        ),
     ];
     pairs
         .into_iter()
@@ -108,6 +111,14 @@ mod tests {
     }
 
     #[test]
+    fn controller_maps_by_label_so_y_opens_the_menu() {
+        let bindings = default_bindings();
+        assert!(bindings[&NdsButton::Y].contains(&"pad:y".to_string()));
+        assert!(bindings[&NdsButton::Y].contains(&"Escape".to_string()));
+        assert!(bindings[&NdsButton::X].contains(&"pad:x".to_string()));
+    }
+
+    #[test]
     fn every_button_has_a_default_binding() {
         let bindings = default_bindings();
         assert!(NdsButton::ALL
@@ -123,13 +134,15 @@ mod tests {
     #[test]
     fn keyboard_and_pad_bindings_both_trigger_their_button() {
         let bindings = default_bindings();
-        assert_eq!(button_mask(&bindings, |input| input == "X"), 1 << 8);
+        assert_eq!(button_mask(&bindings, |input| input == "Return"), 1 << 8);
         assert_eq!(button_mask(&bindings, |input| input == "pad:a"), 1 << 8);
     }
 
     #[test]
     fn simultaneous_buttons_combine() {
-        let mask = button_mask(&default_bindings(), |input| input == "Up" || input == "Z");
+        let mask = button_mask(&default_bindings(), |input| {
+            input == "Up" || input == "Backspace"
+        });
         assert_eq!(mask, 1 << 4 | 1 << 0);
     }
 
@@ -142,7 +155,7 @@ mod tests {
     fn rebinding_moves_the_button() {
         let mut bindings = default_bindings();
         bindings.insert(NdsButton::A, vec!["Space".to_string()]);
-        assert_eq!(button_mask(&bindings, |input| input == "X"), 0);
+        assert_eq!(button_mask(&bindings, |input| input == "Return"), 0);
         assert_eq!(button_mask(&bindings, |input| input == "Space"), 1 << 8);
     }
 
@@ -151,6 +164,6 @@ mod tests {
         let mut bindings = Bindings::from([(NdsButton::A, vec!["Space".to_string()])]);
         fill_missing_with_defaults(&mut bindings);
         assert_eq!(bindings[&NdsButton::A], ["Space"]);
-        assert_eq!(bindings[&NdsButton::B], ["Z", "pad:b"]);
+        assert_eq!(bindings[&NdsButton::B], ["Backspace", "pad:b"]);
     }
 }

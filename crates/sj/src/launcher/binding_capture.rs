@@ -11,6 +11,7 @@ use crate::host_input::{
 pub enum CaptureTarget {
     Button(NdsButton),
     Hotkey(HotkeyAction),
+    PadSwapScreens,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,7 +48,12 @@ pub fn captured_input(event: &Event, thresholds: AxisThresholds) -> Option<Captu
 pub fn apply_capture(settings: &mut Settings, target: CaptureTarget, captured: Captured) -> bool {
     match (target, captured) {
         (_, Captured::Cancelled) => true,
-        (CaptureTarget::Hotkey(_), Captured::Pad(_)) => false,
+        (CaptureTarget::Hotkey(_), Captured::Pad(_))
+        | (CaptureTarget::PadSwapScreens, Captured::Keyboard(_)) => false,
+        (CaptureTarget::PadSwapScreens, Captured::Pad(name)) => {
+            settings.controller.swap_screens_button = name;
+            true
+        }
         (CaptureTarget::Hotkey(action), Captured::Keyboard(key_name)) => {
             settings.hotkeys.set_key(action, key_name);
             true
@@ -139,14 +145,17 @@ mod tests {
         assert!(apply_capture(
             &mut settings,
             target,
-            Captured::Keyboard("Space".into())
+            Captured::Keyboard("K".into())
         ));
         assert!(apply_capture(
             &mut settings,
             target,
-            Captured::Keyboard("Space".into())
+            Captured::Keyboard("K".into())
         ));
-        assert_eq!(settings.bindings[&NdsButton::A], ["X", "pad:a", "Space"]);
+        assert_eq!(
+            settings.bindings[&NdsButton::A],
+            ["Return", "Space", "pad:a", "K"]
+        );
     }
 
     #[test]
@@ -164,6 +173,23 @@ mod tests {
             Captured::Keyboard("F1".into())
         ));
         assert_eq!(settings.hotkeys.save_state, "F1");
+    }
+
+    #[test]
+    fn pad_swap_button_takes_pad_input_only() {
+        let mut settings = Settings::default();
+        let target = CaptureTarget::PadSwapScreens;
+        assert!(!apply_capture(
+            &mut settings,
+            target,
+            Captured::Keyboard("M".into())
+        ));
+        assert!(apply_capture(
+            &mut settings,
+            target,
+            Captured::Pad("pad:leftstick".into())
+        ));
+        assert_eq!(settings.controller.swap_screens_button, "pad:leftstick");
     }
 
     #[test]

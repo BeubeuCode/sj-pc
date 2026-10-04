@@ -4,6 +4,7 @@ use std::process::ExitCode;
 use sj_emu::{Core, CoreConfig, Frame, Pointer};
 use sj_game::core_options::{core_variables, Renderer};
 use sj_game::game_api::GameApi;
+use sj_game::game_mode;
 use sj_game::image::RgbImage;
 use sj_game::input_script::{frame_masks, parse, Step};
 use sj_game::settings::load_or_default;
@@ -105,9 +106,10 @@ impl Lab {
         let directory = snapshot::write(Path::new(SAMPLES_DIR), &snapshot)
             .map_err(|error| error.to_string())?;
         println!(
-            "frame {}: snapshot {}",
+            "frame {}: snapshot {} [{:?}]",
             self.frames_run,
-            directory.display()
+            directory.display(),
+            game_mode::read(&self.core)
         );
         Ok(())
     }

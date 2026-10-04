@@ -9,7 +9,11 @@ Status legend: `done`, `in progress`, `todo`.
 | M1 Boots and plays | done, needs a play-test pass | libretro host, top screen + bottom PiP, input, savestates, fast-forward |
 | M2 Settings UI | half done | launcher screen done (egui); in-game F1 overlay still todo |
 | One-screen UI (A) research tooling | done | `sj-lab` headless runner, F9 snapshots, F12 RAM search |
-| M3 RAM watch + widescreen | todo | detect game mode, auto layout, 16:9 dungeon camera |
+| One-screen UI (B) foundation | mostly done | game-mode detection, screen director, minimap overlay, new bindings; battle mode pending |
+| One-screen UI (C) crop HUD | todo | minimap waits on a dungeon sample; battle enemy panel needs a battle sample |
+| One-screen UI (D) widescreen | todo | 16:9 dungeon camera |
+| One-screen UI (E) native HUD | todo | enemy bars with HP numbers, party bars, heading-up minimap |
+| One-screen UI (F) text entry | todo | name buffers found, encoding and pointer chain to map |
 | M4 Native UI via decomp | todo | ARM9 hooks, native map/menus/dialog drawn at full resolution |
 | M5 Modding | todo | asset redirect + Lua scripts over `GameApi` |
 
@@ -37,3 +41,9 @@ Deliberately not built yet: the RAM watch. It needs real addresses from M3 first
 
 ## Out of scope
 HD textures, netplay, Redux (3DS) content, public release packaging, native plugin ABI.
+
+## One-screen UI: what blocks what
+- Battle layout (enemy panel) needs one battle snapshot: the lab could not get past the ship's story
+  gating headlessly. One F9 press during the first battle unblocks it.
+- The minimap needs a dungeon snapshot to learn which mode shows the automap.
+- Heading-up minimap needs player position and facing (collision code at `0x0202FDD4` is the lead).

@@ -32,6 +32,7 @@ All of `test`, `clippy` and `fmt --check` pass before a task is done.
 Research loop (see `docs/ARCHITECTURE.md`, "Research tooling"):
 ```
 cargo build --release -p sj-lab && ./target/release/sj-lab re/scripts/<script>.txt
+cargo test -p sj-game --test sample_modes -- --ignored   # mode detection vs lab snapshots
 cargo run -p sj -- --play --state re/samples/<label>-<n>/savestate.state
 ```
 The ROM smoke test is `#[ignore]`d. Run it with `cargo test -p sj-emu --test rom_smoke -- --ignored`.

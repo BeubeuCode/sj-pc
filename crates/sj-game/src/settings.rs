@@ -5,8 +5,10 @@ use serde::{Deserialize, Serialize};
 use crate::audio::{AudioSettings, MAX_VOLUME_PERCENT};
 use crate::input::{default_bindings, fill_missing_with_defaults, Bindings};
 use crate::layout::PipSettings;
+use crate::screen_director::HudSettings;
 
 pub const MAX_SCALE: u32 = 8;
+pub const CURRENT_BINDINGS_VERSION: u32 = 2;
 pub const MIN_DEADZONE_PERCENT: u8 = 10;
 pub const MAX_DEADZONE_PERCENT: u8 = 90;
 
@@ -18,10 +20,18 @@ pub struct Settings {
     pub save_dir: PathBuf,
     pub video: VideoSettings,
     pub pip: PipSettings,
+    pub hud: HudSettings,
     pub audio: AudioSettings,
     pub controller: ControllerSettings,
     pub hotkeys: Hotkeys,
     pub bindings: Bindings,
+    #[serde(default = "legacy_bindings_version")]
+    pub bindings_version: u32,
+}
+
+// Files written before version 2 have no version key and carry the old positional pad layout.
+fn legacy_bindings_version() -> u32 {
+    1
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -31,16 +41,18 @@ pub enum ScalingFilter {
     Sharp,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ControllerSettings {
     pub stick_deadzone_percent: u8,
+    pub swap_screens_button: String,
 }
 
 impl Default for ControllerSettings {
     fn default() -> Self {
         Self {
             stick_deadzone_percent: 50,
+            swap_screens_button: "pad:rightstick".into(),
         }
     }
 }
@@ -55,10 +67,11 @@ pub enum HotkeyAction {
     PreviousSlot,
     NextSlot,
     Snapshot,
+    SwapScreens,
 }
 
 impl HotkeyAction {
-    pub const ALL: [HotkeyAction; 8] = [
+    pub const ALL: [HotkeyAction; 9] = [
         HotkeyAction::FastForward,
         HotkeyAction::TogglePip,
         HotkeyAction::ToggleFullscreen,
@@ -66,6 +79,7 @@ impl HotkeyAction {
         HotkeyAction::LoadState,
         HotkeyAction::PreviousSlot,
         HotkeyAction::NextSlot,
+        HotkeyAction::SwapScreens,
         HotkeyAction::Snapshot,
     ];
 
@@ -79,6 +93,7 @@ impl HotkeyAction {
             HotkeyAction::PreviousSlot => "Previous slot",
             HotkeyAction::NextSlot => "Next slot",
             HotkeyAction::Snapshot => "Research snapshot",
+            HotkeyAction::SwapScreens => "Swap screens",
         }
     }
 }
@@ -105,6 +120,7 @@ pub struct Hotkeys {
     pub next_slot: String,
     pub previous_slot: String,
     pub snapshot: String,
+    pub swap_screens: String,
 }
 
 impl Hotkeys {
@@ -118,6 +134,7 @@ impl Hotkeys {
             HotkeyAction::PreviousSlot => &self.previous_slot,
             HotkeyAction::NextSlot => &self.next_slot,
             HotkeyAction::Snapshot => &self.snapshot,
+            HotkeyAction::SwapScreens => &self.swap_screens,
         }
     }
 
@@ -131,6 +148,7 @@ impl Hotkeys {
             HotkeyAction::PreviousSlot => &mut self.previous_slot,
             HotkeyAction::NextSlot => &mut self.next_slot,
             HotkeyAction::Snapshot => &mut self.snapshot,
+            HotkeyAction::SwapScreens => &mut self.swap_screens,
         };
         *slot = key_name;
     }
@@ -169,10 +187,12 @@ impl Default for Settings {
             save_dir: PathBuf::from("saves"),
             video: VideoSettings::default(),
             pip: PipSettings::default(),
+            hud: HudSettings::default(),
             audio: AudioSettings::default(),
             controller: ControllerSettings::default(),
             hotkeys: Hotkeys::default(),
             bindings: default_bindings(),
+            bindings_version: CURRENT_BINDINGS_VERSION,
         }
     }
 }
@@ -193,7 +213,7 @@ impl Default for VideoSettings {
 impl Default for Hotkeys {
     fn default() -> Self {
         Self {
-            fast_forward: "Tab".into(),
+            fast_forward: "`".into(),
             toggle_pip: "P".into(),
             toggle_fullscreen: "F11".into(),
             save_state: "F5".into(),
@@ -201,6 +221,7 @@ impl Default for Hotkeys {
             next_slot: "F7".into(),
             previous_slot: "F6".into(),
             snapshot: "F9".into(),
+            swap_screens: "M".into(),
         }
     }
 }
@@ -278,8 +299,12 @@ mod tests {
     }
 
     #[test]
-    fn empty_file_gives_defaults() {
-        assert_eq!(parse("").unwrap(), Settings::default());
+    fn empty_file_gives_defaults_marked_as_legacy_bindings() {
+        let legacy_defaults = Settings {
+            bindings_version: 1,
+            ..Settings::default()
+        };
+        assert_eq!(parse("").unwrap(), legacy_defaults);
     }
 
     #[test]
@@ -294,7 +319,7 @@ mod tests {
     fn partial_bindings_keep_defaults_for_other_buttons() {
         let settings = parse("[bindings]\na = [\"Space\"]\n").unwrap();
         assert_eq!(settings.bindings[&NdsButton::A], ["Space"]);
-        assert_eq!(settings.bindings[&NdsButton::B], ["Z", "pad:b"]);
+        assert_eq!(settings.bindings[&NdsButton::B], ["Backspace", "pad:b"]);
     }
 
     #[test]
@@ -351,8 +376,17 @@ mod tests {
         hotkeys.set_key(HotkeyAction::SaveState, "F1".into());
         assert_eq!(hotkeys.key_for(HotkeyAction::SaveState), "F1");
         assert_eq!(hotkeys.action_for("F1"), Some(HotkeyAction::SaveState));
-        assert_eq!(hotkeys.action_for("Tab"), Some(HotkeyAction::FastForward));
+        assert_eq!(hotkeys.action_for("`"), Some(HotkeyAction::FastForward));
         assert_eq!(hotkeys.action_for("F12"), None);
+    }
+
+    #[test]
+    fn files_without_a_bindings_version_are_marked_legacy() {
+        assert_eq!(parse("[video]\nscale = 2\n").unwrap().bindings_version, 1);
+        assert_eq!(
+            Settings::default().bindings_version,
+            CURRENT_BINDINGS_VERSION
+        );
     }
 
     #[test]

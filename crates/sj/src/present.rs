@@ -1,13 +1,22 @@
 use glow::HasContext;
 use sj_game::image::RgbImage;
-use sj_game::layout::{screen_rects, PipSettings, NDS_ASPECT};
 use sj_game::rect::RectPx;
+use sj_game::screen_director::Screen;
 use sj_game::settings::ScalingFilter;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RowOrder {
     BottomUp,
     TopDown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FrameInfo {
+    pub width_px: u32,
+    pub height_px: u32,
+    pub texture_width_px: u32,
+    pub texture_height_px: u32,
+    pub row_order: RowOrder,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -176,11 +185,26 @@ impl Presenter {
         });
     }
 
+    pub fn color_texture(&self) -> glow::Texture {
+        self.color
+    }
+
+    pub fn frame_info(&self) -> Option<FrameInfo> {
+        let frame = self.last_frame?;
+        Some(FrameInfo {
+            width_px: frame.width_px,
+            height_px: frame.height_px,
+            texture_width_px: self.capacity_px.0,
+            texture_height_px: self.capacity_px.1,
+            row_order: frame.row_order,
+        })
+    }
+
     pub fn draw(
         &self,
         gl: &glow::Context,
         drawable_px: (u32, u32),
-        pip: &PipSettings,
+        screens: &[(Screen, RectPx)],
         filter: ScalingFilter,
     ) {
         // SAFETY: clears the default framebuffer of the current context.
@@ -194,7 +218,6 @@ impl Presenter {
         let Some(frame) = self.last_frame else {
             return;
         };
-        let rects = screen_rects(drawable_px.0, drawable_px.1, NDS_ASPECT, pip);
         let screen_height_px = frame.height_px / 2;
         let top_screen = RectPx {
             x: 0,
@@ -207,9 +230,12 @@ impl Presenter {
             ..top_screen
         };
         let gl_filter = gl_filter(filter);
-        self.blit(gl, frame, top_screen, rects.top, drawable_px.1, gl_filter);
-        if let Some(pip_rect) = rects.pip {
-            self.blit(gl, frame, bottom_screen, pip_rect, drawable_px.1, gl_filter);
+        for (screen, destination) in screens {
+            let source = match screen {
+                Screen::Top => top_screen,
+                Screen::Bottom => bottom_screen,
+            };
+            self.blit(gl, frame, source, *destination, drawable_px.1, gl_filter);
         }
     }
 

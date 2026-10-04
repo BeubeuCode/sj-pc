@@ -36,9 +36,25 @@ The launcher is split by concern:
 Input names (`"X"`, `"pad:a"`, `"pad:leftx-"`) come from `host_input.rs` for both the launcher's
 capture and the game, so a binding captured in the launcher always matches in game.
 
+## Screen director
+Each frame the app reads the game mode (`sj_game::game_mode`, from the scene flags at `0x0216AB60`)
+and asks `sj_game::screen_director::plan` what to show:
+- **3D field (`0x0400`):** top screen fills the view. The minimap (automap cropped from the bottom
+  screen, anchored to the corner of the game image) is off until a dungeon snapshot shows which mode
+  carries the automap: every `0x0400` sample so far is a ship scene with an empty map.
+- **Ship rooms (facility):** top screen only. Rooms are picked from a menu, so the room map is no use
+  and would cover character portraits.
+- **Menus, mission log, title, name entry, unknown modes:** both screens side by side, because the game splits these screens between detail (top) and list (bottom).
+- **Cinematics:** top screen only.
+- **Swap** (M, right-stick click) shows the bottom screen alone until pressed again.
+
+The `Presenter` blits the main screens. HUD overlays are drawn by egui from the same framebuffer
+texture (`hud.rs`, registered as an egui native texture), which gives cropping and opacity without
+writing shaders. Touch goes to whichever bottom-screen rectangle is visible.
+
 ## Research tooling
 - `sj-lab` (dev binary) runs the core headless in software mode and plays scripts from `re/scripts/`:
-  `wait`, `press`, `hold`, `mash`, `snapshot`, `save`, `load`.
+  `wait`, `press`, `hold`, `mash`, `snapshot`, `save`, `load`. It prints the detected mode per snapshot.
 - Snapshots (`re/samples/<label>-<n>/`, gitignored) hold the savestate, main RAM and both screens as PNG.
   F9 in the app writes the same layout.
 - F12 in the app opens the RAM search panel (value, changed, unchanged, increased, decreased, watch list).

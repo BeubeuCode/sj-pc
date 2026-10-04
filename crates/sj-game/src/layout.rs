@@ -25,7 +25,7 @@ pub struct PipSettings {
 impl Default for PipSettings {
     fn default() -> Self {
         Self {
-            visible: true,
+            visible: false,
             corner: Corner::BottomRight,
             height_fraction: 0.35,
             margin_px: 16,
@@ -33,30 +33,7 @@ impl Default for PipSettings {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ScreenRects {
-    pub top: RectPx,
-    pub pip: Option<RectPx>,
-}
-
-pub fn screen_rects(
-    window_width_px: u32,
-    window_height_px: u32,
-    top_aspect: f32,
-    pip: &PipSettings,
-) -> ScreenRects {
-    let top = fit_centered(window_width_px, window_height_px, top_aspect);
-    if !pip.visible {
-        return ScreenRects { top, pip: None };
-    }
-    let pip_rect = pip_rect(window_width_px, window_height_px, pip);
-    ScreenRects {
-        top,
-        pip: Some(pip_rect),
-    }
-}
-
-fn fit_centered(window_width_px: u32, window_height_px: u32, aspect: f32) -> RectPx {
+pub fn fit_centered(window_width_px: u32, window_height_px: u32, aspect: f32) -> RectPx {
     let width_at_full_height = (window_height_px as f32 * aspect).round() as u32;
     if width_at_full_height <= window_width_px {
         let x = (window_width_px - width_at_full_height) / 2;
@@ -77,15 +54,18 @@ fn fit_centered(window_width_px: u32, window_height_px: u32, aspect: f32) -> Rec
     }
 }
 
-fn pip_rect(window_width_px: u32, window_height_px: u32, pip: &PipSettings) -> RectPx {
-    let height = (window_height_px as f32 * pip.height_fraction).round() as u32;
-    let width = (height as f32 * NDS_ASPECT).round() as u32;
-    let margin = pip.margin_px as i32;
+pub fn corner_rect(
+    window_px: (u32, u32),
+    size_px: (u32, u32),
+    corner: Corner,
+    margin_px: u32,
+) -> RectPx {
+    let margin = margin_px as i32;
     let left = margin;
-    let right = window_width_px as i32 - width as i32 - margin;
+    let right = window_px.0 as i32 - size_px.0 as i32 - margin;
     let top = margin;
-    let bottom = window_height_px as i32 - height as i32 - margin;
-    let (x, y) = match pip.corner {
+    let bottom = window_px.1 as i32 - size_px.1 as i32 - margin;
+    let (x, y) = match corner {
         Corner::TopLeft => (left, top),
         Corner::TopRight => (right, top),
         Corner::BottomLeft => (left, bottom),
@@ -94,8 +74,8 @@ fn pip_rect(window_width_px: u32, window_height_px: u32, pip: &PipSettings) -> R
     RectPx {
         x,
         y,
-        width,
-        height,
+        width: size_px.0,
+        height: size_px.1,
     }
 }
 
@@ -103,18 +83,10 @@ fn pip_rect(window_width_px: u32, window_height_px: u32, pip: &PipSettings) -> R
 mod tests {
     use super::*;
 
-    fn hidden_pip() -> PipSettings {
-        PipSettings {
-            visible: false,
-            ..PipSettings::default()
-        }
-    }
-
     #[test]
     fn widescreen_window_pillarboxes_4_3_image() {
-        let rects = screen_rects(1920, 1080, NDS_ASPECT, &hidden_pip());
         assert_eq!(
-            rects.top,
+            fit_centered(1920, 1080, NDS_ASPECT),
             RectPx {
                 x: 240,
                 y: 0,
@@ -126,9 +98,8 @@ mod tests {
 
     #[test]
     fn tall_window_letterboxes_4_3_image() {
-        let rects = screen_rects(800, 1000, NDS_ASPECT, &hidden_pip());
         assert_eq!(
-            rects.top,
+            fit_centered(800, 1000, NDS_ASPECT),
             RectPx {
                 x: 0,
                 y: 200,
@@ -140,9 +111,8 @@ mod tests {
 
     #[test]
     fn widescreen_aspect_fills_16_9_window() {
-        let rects = screen_rects(1920, 1080, 16.0 / 9.0, &hidden_pip());
         assert_eq!(
-            rects.top,
+            fit_centered(1920, 1080, 16.0 / 9.0),
             RectPx {
                 x: 0,
                 y: 0,
@@ -153,41 +123,25 @@ mod tests {
     }
 
     #[test]
-    fn hidden_pip_has_no_rect() {
+    fn corner_rects_keep_their_margin() {
+        let size = (360, 270);
         assert_eq!(
-            screen_rects(1920, 1080, NDS_ASPECT, &hidden_pip()).pip,
-            None
-        );
-    }
-
-    #[test]
-    fn bottom_right_pip_keeps_margin_and_4_3_aspect() {
-        let pip = PipSettings {
-            height_fraction: 0.25,
-            margin_px: 10,
-            ..PipSettings::default()
-        };
-        let rects = screen_rects(1920, 1080, NDS_ASPECT, &pip);
-        assert_eq!(
-            rects.pip,
-            Some(RectPx {
+            corner_rect((1920, 1080), size, Corner::BottomRight, 10),
+            RectPx {
                 x: 1550,
                 y: 800,
                 width: 360,
                 height: 270
-            })
+            }
         );
-    }
-
-    #[test]
-    fn top_left_pip_sits_at_margin() {
-        let pip = PipSettings {
-            corner: Corner::TopLeft,
-            height_fraction: 0.25,
-            margin_px: 10,
-            ..PipSettings::default()
-        };
-        let rects = screen_rects(1920, 1080, NDS_ASPECT, &pip);
-        assert_eq!(rects.pip.map(|r| (r.x, r.y)), Some((10, 10)));
+        assert_eq!(
+            corner_rect((1920, 1080), size, Corner::TopLeft, 10),
+            RectPx {
+                x: 10,
+                y: 10,
+                width: 360,
+                height: 270
+            }
+        );
     }
 }

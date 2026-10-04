@@ -37,6 +37,15 @@ header and only enables Play for Strange Journey USA (`BMTE`) with a core presen
 
 Click or drag inside the overlay with the left mouse button to touch the screen.
 
+## `[hud]`
+| Key | Default | Meaning |
+|---|---|---|
+| `minimap` | `true` | Show the automap as a minimap while exploring a dungeon |
+| `minimap_corner` | `top-right` | Corner of the minimap |
+| `minimap_height_fraction` | `0.3` | Minimap height as a share of the game image |
+| `minimap_opacity` | `0.85` | 0.2 to 1.0 |
+| `margin_px` | `16` | Gap to the window edges |
+
 ## `[audio]`
 | Key | Default | Meaning |
 |---|---|---|
@@ -47,16 +56,18 @@ Click or drag inside the overlay with the left mouse button to touch the screen.
 | Key | Default | Meaning |
 |---|---|---|
 | `stick_deadzone_percent` | `50` | How far a stick must move to count as a d-pad press, 10 to 90 |
+| `swap_screens_button` | `pad:rightstick` | Pad button that swaps to the bottom screen |
 
 ## `[hotkeys]`
 | Key | Default |
 |---|---|
-| `fast_forward` (hold) | `Tab` |
+| `fast_forward` (hold) | `` ` `` |
 | `toggle_pip` | `P` |
 | `toggle_fullscreen` | `F11` |
 | `save_state` | `F5` |
 | `load_state` | `F8` |
 | `previous_slot`, `next_slot` | `F6`, `F7` |
+| `swap_screens` | `M` |
 | `snapshot` (research) | `F9` |
 
 `F12` opens the RAM search panel. It is a fixed developer key.
@@ -78,6 +89,22 @@ up = ["Up", "pad:dpup", "pad:lefty-"]
 - **Sticks:** `pad:leftx-`, `pad:leftx+`, `pad:lefty-`, `pad:lefty+`, and the same for `rightx` and `righty`.
 - **Triggers:** `pad:lefttrigger`, `pad:righttrigger`.
 
-Controller names are positional, Xbox-style. DS **A** (confirm in SJ) defaults to the bottom face button.
+The launcher's Controls section shows connected controllers and the last pad input it received.
+Press a button there to check your controller works before binding anything.
+
+Default controls (bindings version 2):
+
+| DS button | Keyboard | Pad (by label) | In Strange Journey |
+|---|---|---|---|
+| A | Enter, Space | A | confirm |
+| B | Backspace | B | back |
+| Y | Escape | Y | main menu |
+| X | Tab | X | mission log |
+| L / R | Q / E | LB / RB | automap floor |
+| Start / Select | F / C | Start / Back | end name entry / config |
+| D-pad | WASD, arrows | d-pad, left stick | move and turn |
+
+Files saved before this change have no `bindings_version` and keep their old controls. The launcher
+offers to switch with one click.
 
 Buttons: `a b x y l r start select up down left right`.

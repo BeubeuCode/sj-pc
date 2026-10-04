@@ -64,3 +64,18 @@ Microsoft firmware updates. A Series controller on firmware 5.23 connected but d
 rebinding. `Platform::new` sets `SDL_JOYSTICK_HIDAPI_XBOX=0` on macOS, so SDL uses Apple's framework
 instead. Apple tracks the firmware and no Input Monitoring permission is needed. Linux and Windows are
 unchanged. Revisit when we move to a newer SDL.
+
+## 014 Menus show both screens side by side, not the bottom screen alone
+The plan said menus would put the bottom screen in front. Lab captures showed the Y menu, the mission
+log and name entry split their content: list on the bottom, details on the top. Showing only one
+screen would hide half the menu, so these modes show both screens side by side until native menus exist.
+
+## 015 HUD overlays are drawn by egui from the game framebuffer
+The framebuffer's colour texture is registered with egui. Overlays are textured rectangles with crop
+UVs and an alpha tint. This avoids a hand-written shader pipeline, and native HUD widgets later sit
+in the same egui pass.
+
+## 016 Research runs headless and is scripted
+`sj-lab` plays input scripts at roughly 8x real time and snapshots RAM and screens. Mode detection was
+found by diffing about 90 snapshots. Public Action Replay codes supplied player, battle-unit and item
+addresses.

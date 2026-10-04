@@ -1,12 +1,20 @@
 use sj_game::layout::{Corner, PipSettings};
+use sj_game::screen_director::HudSettings;
 use sj_game::settings::{ScalingFilter, VideoSettings, MAX_SCALE};
 use sj_game::{NDS_SCREEN_HEIGHT_PX, NDS_SCREEN_WIDTH_PX};
 
-pub fn show(ui: &mut egui::Ui, video: &mut VideoSettings, pip: &mut PipSettings) {
+pub fn show(
+    ui: &mut egui::Ui,
+    video: &mut VideoSettings,
+    hud: &mut HudSettings,
+    pip: &mut PipSettings,
+) {
     egui::CollapsingHeader::new("Display")
         .default_open(true)
         .show(ui, |ui| {
             show_video(ui, video);
+            ui.separator();
+            show_hud(ui, hud);
             ui.separator();
             show_touch_screen(ui, pip);
         });
@@ -61,6 +69,45 @@ fn show_video(ui: &mut egui::Ui, video: &mut VideoSettings) {
     });
 }
 
+fn show_hud(ui: &mut egui::Ui, hud: &mut HudSettings) {
+    ui.label("HUD");
+    egui::Grid::new("hud").num_columns(2).show(ui, |ui| {
+        ui.label("Minimap");
+        ui.checkbox(&mut hud.minimap, "Show the automap while exploring");
+        ui.end_row();
+
+        ui.label("Corner");
+        egui::ComboBox::from_id_salt("minimap_corner")
+            .selected_text(corner_label(hud.minimap_corner))
+            .show_ui(ui, |ui| {
+                for corner in [
+                    Corner::TopLeft,
+                    Corner::TopRight,
+                    Corner::BottomLeft,
+                    Corner::BottomRight,
+                ] {
+                    ui.selectable_value(&mut hud.minimap_corner, corner, corner_label(corner));
+                }
+            });
+        ui.end_row();
+
+        ui.label("Size");
+        ui.add(
+            egui::Slider::new(&mut hud.minimap_height_fraction, 0.15..=0.6).custom_formatter(
+                |fraction, _| format!("{:.0}% of window height", fraction * 100.0),
+            ),
+        );
+        ui.end_row();
+
+        ui.label("Opacity");
+        ui.add(
+            egui::Slider::new(&mut hud.minimap_opacity, 0.2..=1.0)
+                .custom_formatter(|opacity, _| format!("{:.0}%", opacity * 100.0)),
+        );
+        ui.end_row();
+    });
+}
+
 fn show_touch_screen(ui: &mut egui::Ui, pip: &mut PipSettings) {
     ui.label("Touch screen overlay");
     egui::Grid::new("touch_screen")
@@ -69,7 +116,7 @@ fn show_touch_screen(ui: &mut egui::Ui, pip: &mut PipSettings) {
             ui.label("Show");
             ui.checkbox(
                 &mut pip.visible,
-                "Visible at start (toggle in game with its hotkey)",
+                "Show the touch screen in a corner (toggle in game with its hotkey)",
             );
             ui.end_row();
 

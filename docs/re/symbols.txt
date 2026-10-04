@@ -1,1 +1,12 @@
 # address  size  name  notes
+0x0216AB60  2   scene_flags          one bit per top-level scene
+0x022142E8  5   player_base_stats    ST VI AG LU MA
+0x022142EE  4   player_max_hp_mp     u16 each
+0x022142F2  5   player_stats         ST VI AG LU MA, effective
+0x022142F8  4   player_hp_mp         u16 each
+0x022142FC  16  player_first_name    u16 chars
+0x0221434C  1   alignment            0 law, 0x80 neutral, 0xFF chaos
+0x02214620  4   macca
+0x0221463C  1   moon_phase
+0x0202FDD4  -   fn_wall_collision    code; r6/r7 tile coords
+0x02036610  -   fn_encounter_gauge   code; s16 at [r4+0xAF2]

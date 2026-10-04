@@ -9,15 +9,17 @@ use sj_emu::{AvInfo, Core, CoreConfig, Frame, Pointer};
 use sj_game::audio::apply_volume;
 use sj_game::core_options::{core_variables, Renderer};
 use sj_game::game_api::GameApi;
+use sj_game::game_mode::{self, GameMode};
 use sj_game::input::button_mask;
-use sj_game::layout::{screen_rects, NDS_ASPECT};
+use sj_game::screen_director::{self, arrangement_rects, touch_target, ScreenPlan};
 use sj_game::settings::{HotkeyAction, Settings};
 use sj_game::snapshot::{self, Snapshot};
 use sj_game::touch::{bottom_screen_to_pointer, mouse_to_bottom_screen};
 
 use crate::capture::{encode_ppm, request_from_env, CaptureRequest};
 use crate::dev_panel::DevPanel;
-use crate::host_input::{key_input_name, AxisThresholds, HostInput};
+use crate::host_input::{key_input_name, pad_button_input_name, AxisThresholds, HostInput};
+use crate::hud::draw_overlays;
 use crate::overlay::Overlay;
 use crate::platform::Platform;
 use crate::present::{read_default_framebuffer, Presenter};
@@ -32,6 +34,7 @@ pub struct App {
     settings: Settings,
     core: Core,
     overlay: Overlay,
+    hud_texture: egui::TextureId,
     dev_panel: DevPanel,
     platform: Platform,
     presenter: Presenter,
@@ -43,6 +46,7 @@ pub struct App {
     frames_presented: u64,
     pending_state: Option<Vec<u8>>,
     slot: u8,
+    swapped: bool,
     fast_forward: bool,
     running: bool,
 }
@@ -57,7 +61,8 @@ impl App {
             .load_game(&settings.rom)
             .map_err(|error| error.to_string())?;
         let presenter = create_presenter(&platform.gl, &core, av_info)?;
-        let overlay = Overlay::new(&platform);
+        let mut overlay = Overlay::new(&platform);
+        let hud_texture = overlay.register_native_texture(presenter.color_texture());
         let audio = open_audio(&platform, av_info)?;
         let thresholds =
             AxisThresholds::from_deadzone_percent(settings.controller.stick_deadzone_percent);
@@ -65,6 +70,7 @@ impl App {
             settings,
             core,
             overlay,
+            hud_texture,
             dev_panel: DevPanel::new(),
             platform,
             presenter,
@@ -76,6 +82,7 @@ impl App {
             frames_presented: 0,
             pending_state: None,
             slot: 0,
+            swapped: false,
             fast_forward: false,
             running: true,
         })
@@ -147,16 +154,24 @@ impl App {
 
     fn present(&mut self) {
         let drawable_px = self.platform.window.drawable_size();
+        let mode = game_mode::read(&self.core);
+        let plan = self.plan(mode);
+        let screens = arrangement_rects(drawable_px, plan.arrangement);
         self.presenter.draw(
             &self.platform.gl,
             drawable_px,
-            &self.settings.pip,
+            &screens,
             self.settings.video.filter,
         );
-        let status = format!("slot: {}", self.slot);
+        let frame = self.presenter.frame_info();
+        let (texture, margin_px) = (self.hud_texture, self.settings.hud.margin_px);
+        let status = format!("mode: {mode:?}  swapped: {}", self.swapped);
         let ram = self.core.main_ram();
         let dev_panel = &mut self.dev_panel;
-        self.overlay.draw(|root| dev_panel.show(root, ram, &status));
+        self.overlay.draw(|root| {
+            draw_overlays(root, &plan, frame, texture, drawable_px, margin_px);
+            dev_panel.show(root, ram, &status);
+        });
         self.capture_if_requested();
         self.platform.window.gl_swap_window();
         self.frames_presented += 1;
@@ -189,20 +204,18 @@ impl App {
         }
     }
 
+    fn plan(&self, mode: GameMode) -> ScreenPlan {
+        screen_director::plan(mode, self.swapped, &self.settings.hud, &self.settings.pip)
+    }
+
     fn pointer(&self) -> Pointer {
         let Some((mouse_x, mouse_y)) = self.mouse_drawable_px else {
             return Pointer::default();
         };
-        let (drawable_width_px, drawable_height_px) = self.platform.window.drawable_size();
-        let rects = screen_rects(
-            drawable_width_px,
-            drawable_height_px,
-            NDS_ASPECT,
-            &self.settings.pip,
-        );
-        let Some(touch) = rects
-            .pip
-            .and_then(|pip| mouse_to_bottom_screen(pip, mouse_x, mouse_y))
+        let drawable_px = self.platform.window.drawable_size();
+        let plan = self.plan(game_mode::read(&self.core));
+        let Some(touch) = touch_target(drawable_px, &plan, self.settings.hud.margin_px)
+            .and_then(|target| mouse_to_bottom_screen(target, mouse_x, mouse_y))
         else {
             return Pointer::default();
         };
@@ -257,7 +270,12 @@ impl App {
                 self.platform.close_controller(which);
                 self.input.release_all_pad_inputs();
             }
-            Event::ControllerButtonDown { button, .. } => self.input.set_pad_button(button, true),
+            Event::ControllerButtonDown { button, .. } => {
+                if pad_button_input_name(button) == self.settings.controller.swap_screens_button {
+                    self.swapped = !self.swapped;
+                }
+                self.input.set_pad_button(button, true);
+            }
             Event::ControllerButtonUp { button, .. } => self.input.set_pad_button(button, false),
             Event::ControllerAxisMotion { axis, value, .. } => self.input.set_pad_axis(axis, value),
             Event::MouseButtonDown {
@@ -300,6 +318,7 @@ impl App {
             HotkeyAction::PreviousSlot => self.select_slot(previous_slot(self.slot)),
             HotkeyAction::NextSlot => self.select_slot(next_slot(self.slot)),
             HotkeyAction::Snapshot => self.take_snapshot(),
+            HotkeyAction::SwapScreens => self.swapped = !self.swapped,
         }
     }
 

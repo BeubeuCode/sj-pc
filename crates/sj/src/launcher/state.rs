@@ -72,7 +72,12 @@ impl LauncherState {
                 ui.heading("Shin Megami Tensei: Strange Journey");
                 ui.add_space(8.0);
                 game_section::show(ui, self);
-                display_section::show(ui, &mut self.settings.video, &mut self.settings.pip);
+                display_section::show(
+                    ui,
+                    &mut self.settings.video,
+                    &mut self.settings.hud,
+                    &mut self.settings.pip,
+                );
                 sound_section::show(ui, &mut self.settings.audio);
                 controls_section::show(
                     ui,

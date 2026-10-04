@@ -1,7 +1,9 @@
 pub mod addr;
+pub mod addresses;
 pub mod audio;
 pub mod core_options;
 pub mod game_api;
+pub mod game_mode;
 pub mod image;
 pub mod input;
 pub mod input_script;
@@ -11,6 +13,7 @@ pub mod png;
 pub mod ram_search;
 pub mod rect;
 pub mod rom;
+pub mod screen_director;
 pub mod settings;
 pub mod snapshot;
 pub mod touch;

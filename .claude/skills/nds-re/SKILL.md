@@ -15,6 +15,12 @@ description: Nintendo DS reverse-engineering and libretro-host knowledge for the
 - 3D geometry ports start at `0x04000400`. Main 2D engine registers at `0x04000000`, sub engine at `0x04001000`.
 - Hardware reference: GBATEK (problemkaputt.de/gbatek.htm). Name hardware constants exactly as GBATEK does.
 
+## Known addresses
+`crates/sj-game/src/addresses.rs` is the code's source of truth; `docs/re/MEMORY_MAP.md` explains each.
+Highlights: scene flags `0x0216AB60` (game mode), player HP/MP `0x022142F8`. Public cheat codes for BMTE
+are already mined (`docs/re/README.md`); check them before hunting, and confirm any cheat address in a
+snapshot before trusting it.
+
 ## Recipes
 - **Find a variable:** follow the memory-diff recipe in `docs/re/README.md`, then confirm with a Ghidra xref.
 - **Patch code or data:** add a `sj_game::patch::Patch` with the exact original bytes. `apply` refuses on
@@ -27,6 +33,8 @@ description: Nintendo DS reverse-engineering and libretro-host knowledge for the
   `press BUTTONS [times]`, `hold BUTTONS N`, `mash BUTTONS N every M`, `snapshot LABEL`, `save PATH`,
   `load PATH`; buttons joined with `+`). Run several branches in parallel processes from one
   checkpoint. B in facility menus jumps the cursor to "Move"; mashing A re-opens conversations.
+- **Diff modes:** group snapshots by what the screens show, then look for values constant within
+  each group and different across groups (that is how the scene flags were found).
 - **Boot test without a window:** `cargo test -p sj-emu --test rom_smoke -- --ignored` runs 600 frames in software mode.
 
 ## libretro host gotchas (learned the hard way)
