@@ -24,6 +24,7 @@ header and only enables Play for Strange Journey USA (`BMTE`) with a core presen
 | `scale` | `4` | 3D internal resolution, 1 to 8 times native |
 | `fullscreen` | `false` | Start in borderless fullscreen |
 | `vsync` | `true` | Sync presents to the display |
+| `widescreen` | `true` | 16:9 3D when the top screen is shown alone; needs our patched core and the OpenGL renderer |
 | `window_width_px`, `window_height_px` | `1280`, `960` | Starting window size; the window is resizable |
 | `filter` | `smooth` | `smooth` (bilinear) or `sharp` (nearest-neighbour) scaling of the screens |
 

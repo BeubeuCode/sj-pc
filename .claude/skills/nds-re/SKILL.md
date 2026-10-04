@@ -18,11 +18,16 @@ description: Nintendo DS reverse-engineering and libretro-host knowledge for the
 ## Known addresses
 `crates/sj-game/src/addresses.rs` is the code's source of truth; `docs/re/MEMORY_MAP.md` explains each.
 Highlights: scene flags `0x0216AB60` (game mode), player HP/MP `0x022142F8`, current scene `0x0216B440`
-(child `+0x1C`; battle unit table at `+0x94`), dungeon bit `0x10` at `0x0216B44C`, dialogue window
+(child `+0x1C`; battle unit table at `+0x94`), dungeon = current scene `+0x08` is `0x0203034C`, dialogue window
 `0x0216B9AC`. Scene flags alone confuse the title with dungeons (both `0x0000`).
 Text is ASCII minus `0x1F` (`sj_game::text`); battle unit `+0x28` points at the demon's name string. Cheat codes hardcode heap addresses: the AR battle table `0x02229514`
 was wrong in our runs, so confirm any cheat address in a snapshot before trusting it. Public cheat codes for BMTE are already mined
 (`docs/re/README.md`); check them before hunting.
+
+Game data tables are TBB1/MBB containers in the ROM (`Data/Enemy/NKMBaseTable.tbb`,
+`Data/Skill/SkillStrData.mbb`...): a header, then TBL1 (fixed-size records) or MTBL (string offsets)
+blocks. Many stay loaded whole in RAM, so search a snapshot for a block's first bytes to find it.
+String table entries are numbered from 2 (entry = ID + 2).
 
 ## Recipes
 - **Find a variable:** follow the memory-diff recipe in `docs/re/README.md`, then confirm with a Ghidra xref.
@@ -34,8 +39,12 @@ was wrong in our runs, so confirm any cheat address in a snapshot before trustin
   Convert the PPM to PNG with a few lines of stdlib Python (zlib + struct) to view it.
 - **Reach a game state headlessly:** write a `re/scripts/*.txt` script for `sj-lab` (`wait N`,
   `press BUTTONS [times]`, `hold BUTTONS N`, `mash BUTTONS N every M`, `snapshot LABEL`, `save PATH`,
-  `load PATH`; buttons joined with `+`). Run several branches in parallel processes from one
+  `load PATH`, `poke32 ADDR VALUE` in hex; buttons joined with `+`). Run several branches in parallel processes from one
   checkpoint. B in facility menus jumps the cursor to "Move"; mashing A re-opens conversations.
+- **Decode a field from what the game draws:** poke test values with `poke32` in a lab script and
+  snapshot the screen that shows it. Status pages draw from copies made when the battle starts, so
+  poke before the copy or check against a card the game already drew (resistances were decoded
+  that way: kind = value >> 10, in the order of the label strings).
 - **Diff modes:** group snapshots by what the screens show, then look for values constant within
   each group and different across groups (that is how the scene flags were found).
 - **Boot test without a window:** `cargo test -p sj-emu --test rom_smoke -- --ignored` runs 600 frames in software mode.
@@ -58,7 +67,20 @@ was wrong in our runs, so confirm any cheat address in a snapshot before trustin
   Use it first when a controller "doesn't work": it tells detection problems from input problems.
   On macOS, Xbox pads go through Apple's driver (docs/DECISIONS.md 013).
 
+## Widescreen gotchas
+- The top-screen UI is 3D. A game-side aspect patch stretches it; ours squeezes all 3D by 3/4 into a
+  4/3 wider target instead (`docs/re/WIDESCREEN.md`). `sj-lab` renders in software and stays 4:3, so check
+  widescreen with app captures (`SJ_CAPTURE_*`).
+- Patching projection literals only takes effect when the scene is rebuilt; they run once per scene.
+- Interface polygons are flat: all vertices share one w (409600 for the status bar). That is how the
+  patch tells them from the scene. Bounds checks on them need a little slack for float rounding.
+- melonDS's engine B reuses engine A's compositor program and copies its uniform locations in
+  `InitShaders(other)`: add every new location there, or B writes to location 0.
+
 ## Build gotchas
+- Core changes live in `patches/melonDS*/`; `build-core.sh` discards edits under `extern/` and
+  re-applies the patches (docs/BUILDING.md). Regenerate the patch after editing.
+- Never overwrite a core the game may have loaded: copy to a temp name and rename over it.
 - Homebrew rustup is keg-only: `export PATH="/opt/homebrew/opt/rustup/bin:$PATH"`.
 - CMake 4 needs `CMAKE_POLICY_VERSION_MINIMUM=3.5` for the bundled SDL2. It is set in `.cargo/config.toml`.
 - Rebuild the core with `scripts/build-core.sh`. Rust never builds it.

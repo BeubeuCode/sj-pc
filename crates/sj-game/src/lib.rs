@@ -3,6 +3,7 @@ pub mod addresses;
 pub mod audio;
 pub mod battle;
 pub mod core_options;
+pub mod demon_data;
 pub mod game_api;
 pub mod game_mode;
 pub mod image;
@@ -17,6 +18,7 @@ pub mod rom;
 pub mod screen_director;
 pub mod settings;
 pub mod snapshot;
+pub mod stock;
 pub mod text;
 pub mod touch;
 

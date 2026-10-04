@@ -14,6 +14,16 @@ cargo run                # first run writes sj.toml with defaults
 
 `sj.toml`, `roms/`, `cores/` and `saves/` are relative to the working directory, so run from the repo root.
 
+## Our core patches
+The core is melonDS DS plus our patches in `patches/melonDS/` and `patches/melonDS-ds/` (widescreen 3D,
+see `docs/DECISIONS.md` 017). `build-core.sh` checks out melonDS at the commit melonDS DS pins into
+`extern/melonDS` (gitignored), resets both trees, applies the patches and builds against them.
+The patch files are the source of truth: edits made directly under `extern/` are discarded on the next
+run. To change a patch, edit under `extern/`, rebuild with `cmake --build extern/build --parallel`, then
+regenerate it with `git -C extern/melonDS diff > patches/melonDS/0001-widescreen.patch` (or
+`extern/melonDS-ds` for the other one). The script installs the core by renaming a new file over the
+old one, so a game that is running keeps working.
+
 ## macOS
 ```
 brew install rustup cmake
@@ -35,7 +45,7 @@ The X11, Wayland, ALSA and PulseAudio headers let the bundled SDL2 build its bac
 
 ## Windows
 Install Visual Studio Build Tools (the C++ workload), CMake and rustup (MSVC toolchain).
-Run `scripts/build-core.sh` from Git Bash, or run the two `cmake` commands from it by hand.
+Run `scripts/build-core.sh` from Git Bash.
 The core comes out as `melondsds_libretro.dll`.
 
 ## Notes

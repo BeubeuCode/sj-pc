@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use crate::addr::Arm9Addr;
 use crate::input::NdsButton;
 
 pub const PRESS_HOLD_FRAMES: u32 = 4;
@@ -32,6 +33,10 @@ pub enum Step {
     },
     LoadState {
         path: PathBuf,
+    },
+    Poke32 {
+        addr: Arm9Addr,
+        value: u32,
     },
 }
 
@@ -70,7 +75,10 @@ pub fn frame_masks(step: &Step) -> Vec<u16> {
                 }
             })
             .collect(),
-        Step::Snapshot { .. } | Step::SaveState { .. } | Step::LoadState { .. } => Vec::new(),
+        Step::Snapshot { .. }
+        | Step::SaveState { .. }
+        | Step::LoadState { .. }
+        | Step::Poke32 { .. } => Vec::new(),
     }
 }
 
@@ -116,6 +124,10 @@ fn parse_line(text: &str) -> Result<Step, String> {
         ["load", path] => Ok(Step::LoadState {
             path: PathBuf::from(path),
         }),
+        ["poke32", addr, value] => Ok(Step::Poke32 {
+            addr: Arm9Addr(hex_number(addr)?),
+            value: hex_number(value)?,
+        }),
         _ => Err(format!("cannot understand `{text}`")),
     }
 }
@@ -123,6 +135,11 @@ fn parse_line(text: &str) -> Result<Step, String> {
 fn number(text: &str) -> Result<u32, String> {
     text.parse()
         .map_err(|_| format!("`{text}` is not a whole number"))
+}
+
+fn hex_number(text: &str) -> Result<u32, String> {
+    let digits = text.strip_prefix("0x").unwrap_or(text);
+    u32::from_str_radix(digits, 16).map_err(|_| format!("`{text}` is not a hex number"))
 }
 
 fn button_mask(text: &str) -> Result<u16, String> {
@@ -170,6 +187,17 @@ mod tests {
                     path: "cp/title.state".into()
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn poke_writes_a_word_given_in_hex() {
+        assert_eq!(
+            parse("poke32 0x021683d8 1c71").unwrap(),
+            vec![Step::Poke32 {
+                addr: Arm9Addr(0x0216_83D8),
+                value: 0x1C71
+            }]
         );
     }
 

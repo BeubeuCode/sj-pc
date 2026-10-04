@@ -107,6 +107,7 @@ pub struct VideoSettings {
     pub window_width_px: u32,
     pub window_height_px: u32,
     pub filter: ScalingFilter,
+    pub widescreen: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -206,6 +207,7 @@ impl Default for VideoSettings {
             window_width_px: 1280,
             window_height_px: 960,
             filter: ScalingFilter::Smooth,
+            widescreen: true,
         }
     }
 }

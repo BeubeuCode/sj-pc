@@ -1,0 +1,223 @@
+diff --git a/src/libretro/config/config.cpp b/src/libretro/config/config.cpp
+index 641ce918..b2f962a3 100644
+--- a/src/libretro/config/config.cpp
++++ b/src/libretro/config/config.cpp
+@@ -907,6 +907,12 @@ static void MelonDsDs::config::ParseVideoOptions(CoreConfig& config) noexcept {
+         config.SetBetterPolygonSplitting(false);
+     }
+ 
++    if (optional<bool> value = ParseBoolean(get_variable(WIDESCREEN))) {
++        config.SetWideScreen(*value);
++    } else {
++        config.SetWideScreen(false);
++    }
++
+ #ifdef HAVE_COMPUTE_RENDERER
+     if (optional<bool> value = ParseBoolean(get_variable(COMPUTE_HIRES_COORDINATES))) {
+         config.SetHiresCoordinates(*value);
+diff --git a/src/libretro/config/config.hpp b/src/libretro/config/config.hpp
+index 20c526d8..352f7c18 100644
+--- a/src/libretro/config/config.hpp
++++ b/src/libretro/config/config.hpp
+@@ -364,6 +364,9 @@ namespace MelonDsDs {
+         [[nodiscard]] bool BetterPolygonSplitting() const noexcept { return _betterPolygonSplitting; }
+         void SetBetterPolygonSplitting(bool betterPolygonSplitting) noexcept { _betterPolygonSplitting = betterPolygonSplitting; }
+ 
++        [[nodiscard]] bool WideScreen() const noexcept { return _wideScreen; }
++        void SetWideScreen(bool wideScreen) noexcept { _wideScreen = wideScreen; }
++
+ #ifdef HAVE_COMPUTE_RENDERER
+         [[nodiscard]] bool HiresCoordinates() const noexcept { return _hiresCoordinates; }
+         void SetHiresCoordinates(bool hiresCoordinates) noexcept { _hiresCoordinates = hiresCoordinates; }
+@@ -535,6 +538,7 @@ namespace MelonDsDs {
+         mutable std::unordered_map<std::string, uint32_t> _dsiNandRegionCache;
+         int _scaleFactor = 1;
+         bool _betterPolygonSplitting = false;
++        bool _wideScreen = false;
+         bool _hiresCoordinates = true;
+         RenderMode _configuredRenderer;
+         bool _threadedSoftRenderer = false;
+diff --git a/src/libretro/config/constants.hpp b/src/libretro/config/constants.hpp
+index e51359f3..32baada5 100644
+--- a/src/libretro/config/constants.hpp
++++ b/src/libretro/config/constants.hpp
+@@ -182,6 +182,7 @@ namespace MelonDsDs::config {
+         static constexpr const char *const OPENGL_RESOLUTION = "melonds_opengl_resolution";
+         static constexpr const char *const RENDER_MODE = "melonds_render_mode";
+         static constexpr const char *const THREADED_RENDERER = "melonds_threaded_renderer";
++        static constexpr const char *const WIDESCREEN = "melonds_widescreen";
+     }
+ 
+     namespace values {
+diff --git a/src/libretro/config/definitions/video.hpp b/src/libretro/config/definitions/video.hpp
+index 81cfa604..a35f3fa3 100644
+--- a/src/libretro/config/definitions/video.hpp
++++ b/src/libretro/config/definitions/video.hpp
+@@ -93,6 +93,22 @@ namespace MelonDsDs::config::definitions {
+         MelonDsDs::config::values::ENABLED
+     };
+ 
++    constexpr retro_core_option_v2_definition WideScreen {
++        config::video::WIDESCREEN,
++        "Widescreen 3D (16:9)",
++        nullptr,
++        "Draws the 3D scene 4/3 wider and keeps 2D layers 4:3 in the middle. "
++        "OpenGL (Classic) renderer and Top/Bottom layout only.",
++        nullptr,
++        config::video::CATEGORY,
++        {
++            {MelonDsDs::config::values::DISABLED, nullptr},
++            {MelonDsDs::config::values::ENABLED, nullptr},
++            {nullptr, nullptr},
++        },
++        MelonDsDs::config::values::DISABLED
++    };
++
+ #ifdef HAVE_COMPUTE_RENDERER
+     constexpr retro_core_option_v2_definition ComputeHiresCoordinates {
+         config::video::COMPUTE_HIRES_COORDINATES,
+@@ -139,6 +155,7 @@ namespace MelonDsDs::config::definitions {
+         RenderMode,
+         OpenGlScaleFactor,
+         OpenGlBetterPolygons,
++        WideScreen,
+ #ifdef HAVE_COMPUTE_RENDERER
+         ComputeHiresCoordinates,
+ #endif
+diff --git a/src/libretro/render/opengl.cpp b/src/libretro/render/opengl.cpp
+index d2aec346..9d129336 100644
+--- a/src/libretro/render/opengl.cpp
++++ b/src/libretro/render/opengl.cpp
+@@ -319,6 +319,7 @@ void MelonDsDs::OpenGLRenderState::ContextReset(melonDS::NDS& nds, const CoreCon
+         ApplyRendererSettings(nds, config);
+         _appliedScaleFactor = config.ScaleFactor();
+         _appliedBetterPolygons = config.BetterPolygonSplitting();
++        _appliedWideScreen = config.WideScreen();
+         _appliedHiresCoordinates = config.HiresCoordinates();
+         retro::debug("Installed {} renderer and applied its settings", _mode);
+ 
+@@ -507,6 +508,7 @@ void MelonDsDs::OpenGLRenderState::Render(
+         _appliedBetterPolygons != config.BetterPolygonSplitting()
+         || _appliedScaleFactor != config.ScaleFactor()
+         || _appliedHiresCoordinates != config.HiresCoordinates()
++        || _appliedWideScreen != config.WideScreen()
+     ) {
+         // If any of the OpenGL renderer's settings have changed...
+         _needsRefresh = true;
+@@ -814,6 +816,7 @@ void MelonDsDs::OpenGLRenderState::InitFrameState(melonDS::NDS& nds, const CoreC
+         _appliedScaleFactor != config.ScaleFactor()
+         || _appliedBetterPolygons != config.BetterPolygonSplitting()
+         || _appliedHiresCoordinates != config.HiresCoordinates()
++        || _appliedWideScreen != config.WideScreen()
+     ) {
+         // Only push settings to melonDS when they've actually changed.
+         // A refresh is requested for every screen layout change too,
+@@ -821,6 +824,7 @@ void MelonDsDs::OpenGLRenderState::InitFrameState(melonDS::NDS& nds, const CoreC
+         ApplyRendererSettings(nds, config);
+         _appliedScaleFactor = config.ScaleFactor();
+         _appliedBetterPolygons = config.BetterPolygonSplitting();
++        _appliedWideScreen = config.WideScreen();
+         _appliedHiresCoordinates = config.HiresCoordinates();
+     }
+ 
+@@ -952,4 +956,14 @@ void MelonDsDs::OpenGLRenderState::InitVertices(const ScreenLayoutData& screenLa
+             }
+             break;
+     }
++
++    if (screenLayout.WideScreen()) {
++        // melonDS's widescreen output is 4/3 wider on both screens; the bottom screen's 2D sits in
++        // the middle 3/4, so sample only that part.
++        for (Vertex& vertex : screen_vertices) {
++            if (vertex.texcoord.z == BOTTOM_SCREEN_LAYER) {
++                vertex.texcoord.x = 0.125f + vertex.texcoord.x * 0.75f;
++            }
++        }
++    }
+ }
+diff --git a/src/libretro/render/opengl.hpp b/src/libretro/render/opengl.hpp
+index 65ff943a..89624fae 100644
+--- a/src/libretro/render/opengl.hpp
++++ b/src/libretro/render/opengl.hpp
+@@ -139,6 +139,7 @@ namespace MelonDsDs {
+         // so we track the ones we last gave it to know when they've changed.
+         unsigned _appliedScaleFactor = 0;
+         bool _appliedBetterPolygons = false;
++        bool _appliedWideScreen = false;
+         bool _appliedHiresCoordinates = false;
+         GLuint _screenProgram = 0;
+         std::array<Vertex, 18> screen_vertices {};
+diff --git a/src/libretro/render/render.cpp b/src/libretro/render/render.cpp
+index 290c6786..95f64bb5 100644
+--- a/src/libretro/render/render.cpp
++++ b/src/libretro/render/render.cpp
+@@ -42,6 +42,7 @@ void MelonDsDs::ApplyRendererSettings(melonDS::NDS& nds, const CoreConfig& confi
+         .Threaded = config.ThreadedSoftRenderer(),
+         .HiresCoordinates = config.HiresCoordinates(), // Compute renderer only
+         .BetterPolygons = config.BetterPolygonSplitting(), // Legacy OpenGL renderer only
++        .WideScreen = config.WideScreen(), // Legacy OpenGL renderer only; the software renderer ignores it
+     };
+ 
+     nds.GetRenderer().SetRenderSettings(settings);
+diff --git a/src/libretro/screenlayout.cpp b/src/libretro/screenlayout.cpp
+index fb727c90..a020d690 100644
+--- a/src/libretro/screenlayout.cpp
++++ b/src/libretro/screenlayout.cpp
+@@ -170,6 +170,10 @@ constexpr mat3 FlippedHybridSouthwestMatrix(unsigned resolutionScale, unsigned h
+ 
+ mat3 MelonDsDs::ScreenLayoutData::GetTopScreenMatrix(unsigned scale) const noexcept {
+     ZoneScopedN(TracyFunction);
++    if (wideScreen) {
++        // the top screen stretches over the 4/3 wider buffer
++        return glm::scale(mat3(1), vec2(scale * 4.0f / 3.0f, float(scale)));
++    }
+     switch (Layout()) {
+         case ScreenLayout::TopBottom:
+         case ScreenLayout::TopOnly:
+@@ -209,6 +213,13 @@ mat3 MelonDsDs::ScreenLayoutData::GetBottomScreenMatrix(unsigned scale) const no
+         case ScreenLayout::UpsideDown:
+             return SouthwestMatrix(scale, screenGap);
+         case ScreenLayout::TopBottom:
++            if (wideScreen) {
++                // the bottom screen keeps its 256 columns, centred under the wide top screen
++                return math::ts<float>(
++                    vec2(scale * NDS_SCREEN_WIDTH / 6.0f, scale * (NDS_SCREEN_HEIGHT + screenGap)),
++                    vec2(scale)
++                );
++            }
+             return SouthwestScaledMatrix(scale, screenGap, secondaryScreenScaleFactor);
+         case ScreenLayout::BottomTop:
+         case ScreenLayout::BottomOnly:
+@@ -261,6 +272,11 @@ void MelonDsDs::ScreenLayoutData::Apply(const CoreConfig& config, const RenderSt
+     secondaryScreenScale = config.SecondaryScreenScale();
+     secondaryScreenScaleFactor = static_cast<float>(secondaryScreenScale) / 100.0f;
+     HybridRatio(config.HybridRatio());
++#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
++    wideScreen = config.WideScreen()
++        && renderState.GetRenderMode() == RenderMode::OpenGl
++        && Layout() == ScreenLayout::TopBottom;
++#endif
+     Update();
+ }
+ 
+diff --git a/src/libretro/screenlayout.hpp b/src/libretro/screenlayout.hpp
+index 6edc64e4..b82e7202 100644
+--- a/src/libretro/screenlayout.hpp
++++ b/src/libretro/screenlayout.hpp
+@@ -219,6 +219,7 @@ namespace MelonDsDs {
+ 
+         unsigned SecondaryScreenScale() const noexcept { return secondaryScreenScale; }
+         float SecondaryScreenScaleFactor() const noexcept { return secondaryScreenScaleFactor; }
++        bool WideScreen() const noexcept { return wideScreen; }
+         void SecondaryScreenScale(unsigned _scale) noexcept {
+             if (_scale != secondaryScreenScale) _dirty = true;
+             secondaryScreenScale = _scale;
+@@ -289,6 +290,8 @@ namespace MelonDsDs {
+         unsigned screenGap;
+         unsigned secondaryScreenScale;
+         float secondaryScreenScaleFactor;
++        // 16:9 top screen (OpenGL, Top/Bottom layout only): see melonDS RendererSettings::WideScreen
++        bool wideScreen = false;
+ 
+         HybridSideScreenDisplay hybridSmallScreenLayout;
+         unsigned hybridRatio;

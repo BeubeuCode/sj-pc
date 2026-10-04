@@ -7,19 +7,21 @@ use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
 use sj_emu::{AvInfo, Core, CoreConfig, Frame, Pointer};
 use sj_game::audio::apply_volume;
-use sj_game::battle::{read_enemies, EnemyStatus};
+use sj_game::battle::{bottom_page, list_cursor, read_enemies, read_hero, BottomPage, UnitStatus};
 use sj_game::core_options::{core_variables, Renderer};
 use sj_game::game_api::GameApi;
 use sj_game::game_mode::{self, GameMode};
 use sj_game::input::button_mask;
 use sj_game::screen_director::{
-    self, arrangement_rects, enemy_panel_rects, touch_target, ScreenPlan,
+    self, arrangement_rects, enemy_panel_rects, is_wide_frame, source_span, touch_target,
+    ScreenPlan,
 };
 use sj_game::settings::{HotkeyAction, Settings};
 use sj_game::snapshot::{self, Snapshot};
+use sj_game::stock::read_stock;
 use sj_game::touch::{bottom_screen_to_pointer, mouse_to_bottom_screen};
 
-use crate::battle_hud::draw_enemy_panels;
+use crate::battle_hud::{draw_unit_panels, panel_height_ds_px};
 use crate::capture::{encode_ppm, request_from_env, CaptureRequest};
 use crate::dev_panel::DevPanel;
 use crate::host_input::{key_input_name, pad_button_input_name, AxisThresholds, HostInput};
@@ -183,7 +185,10 @@ impl App {
         let drawable_px = self.platform.window.drawable_size();
         let mode = game_mode::read(&self.core);
         let plan = self.plan(mode);
-        let screens = arrangement_rects(drawable_px, plan.arrangement);
+        let screens: Vec<_> = arrangement_rects(drawable_px, &plan)
+            .into_iter()
+            .map(|(screen, rect)| (screen, rect, source_span(screen, &plan)))
+            .collect();
         self.presenter.draw(
             &self.platform.gl,
             drawable_px,
@@ -192,14 +197,16 @@ impl App {
         );
         let frame = self.presenter.frame_info();
         let (texture, margin_px) = (self.hud_texture, self.settings.hud.margin_px);
-        let enemies = self.visible_enemies(mode);
-        let enemy_rects = enemy_panel_rects(drawable_px, enemies.len(), margin_px);
+        let enemies = self.visible_units(mode);
+        let selected = self.selected_unit(mode);
+        let heights: Vec<u32> = enemies.iter().map(panel_height_ds_px).collect();
+        let enemy_rects = enemy_panel_rects(drawable_px, &plan, &heights, margin_px);
         let status = format!("mode: {mode:?}  swapped: {}", self.swapped);
         let ram = self.core.main_ram();
         let dev_panel = &mut self.dev_panel;
         self.overlay.draw(|root| {
             draw_overlays(root, &plan, frame, texture, drawable_px, margin_px);
-            draw_enemy_panels(root, &enemies, &enemy_rects);
+            draw_unit_panels(root, &enemies, &enemy_rects, selected);
             dev_panel.show(root, ram, &status);
         });
         self.capture_if_requested();
@@ -234,18 +241,44 @@ impl App {
         }
     }
 
-    fn visible_enemies(&self, mode: GameMode) -> Vec<EnemyStatus> {
-        if mode != (GameMode::Battle { bottom_menu: false })
-            || self.swapped
-            || !self.settings.hud.enemy_panel
-        {
+    // Native replacement for the game's bottom screen in battle: the panels follow the page it is on,
+    // so L and R switch them as on the DS. Party status is the hero plus the stock, like the game's;
+    // the Summon list is the stock. Other pages (battle results) show nothing.
+    fn visible_units(&self, mode: GameMode) -> Vec<UnitStatus> {
+        if mode != GameMode::Battle || self.swapped || !self.settings.hud.enemy_panel {
             return Vec::new();
         }
-        read_enemies(&self.core)
+        match bottom_page(&self.core) {
+            Some(BottomPage::EnemyStatus) => read_enemies(&self.core),
+            Some(BottomPage::PartyStatus) => read_hero(&self.core)
+                .into_iter()
+                .chain(read_stock(&self.core))
+                .collect(),
+            Some(BottomPage::SummonList) => read_stock(&self.core),
+            _ => Vec::new(),
+        }
+    }
+
+    // The Summon list's red frame; other pages have no selection to show.
+    fn selected_unit(&self, mode: GameMode) -> Option<usize> {
+        if mode != GameMode::Battle || bottom_page(&self.core) != Some(BottomPage::SummonList) {
+            return None;
+        }
+        list_cursor(&self.core)
     }
 
     fn plan(&self, mode: GameMode) -> ScreenPlan {
-        screen_director::plan(mode, self.swapped, &self.settings.hud, &self.settings.pip)
+        let wide_frame = self
+            .presenter
+            .frame_info()
+            .is_some_and(|frame| is_wide_frame(frame.width_px, frame.height_px));
+        screen_director::plan(
+            mode,
+            self.swapped,
+            &self.settings.hud,
+            &self.settings.pip,
+            wide_frame,
+        )
     }
 
     fn pointer(&self) -> Pointer {
@@ -259,7 +292,7 @@ impl App {
         else {
             return Pointer::default();
         };
-        let (x, y) = bottom_screen_to_pointer(touch.0, touch.1);
+        let (x, y) = bottom_screen_to_pointer(touch.0, touch.1, plan.wide_frame);
         Pointer {
             x,
             y,

@@ -12,8 +12,14 @@ pub fn core_variables(settings: &Settings, renderer: Renderer) -> Vec<(String, S
         Renderer::OpenGl => "opengl",
         Renderer::Software => "software",
     };
+    let widescreen = if settings.video.widescreen && renderer == Renderer::OpenGl {
+        "enabled"
+    } else {
+        "disabled"
+    };
     let pinned = [
         ("melonds_render_mode", render_mode),
+        ("melonds_widescreen", widescreen),
         ("melonds_opengl_resolution", scale.as_str()),
         ("melonds_boot_mode", "direct"),
         ("melonds_console_mode", "ds"),
@@ -47,6 +53,25 @@ mod tests {
         assert_eq!(
             value_of(&variables, "melonds_render_mode"),
             Some("software")
+        );
+    }
+
+    #[test]
+    fn widescreen_needs_the_opengl_renderer() {
+        let settings = Settings::default();
+        assert_eq!(
+            value_of(
+                &core_variables(&settings, Renderer::OpenGl),
+                "melonds_widescreen"
+            ),
+            Some("enabled")
+        );
+        assert_eq!(
+            value_of(
+                &core_variables(&settings, Renderer::Software),
+                "melonds_widescreen"
+            ),
+            Some("disabled")
         );
     }
 

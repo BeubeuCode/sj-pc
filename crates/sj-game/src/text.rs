@@ -4,6 +4,19 @@ const CHAR_OFFSET: u8 = 0x1F;
 const START_MARK: [u8; 2] = [0xFF, 0xFF];
 const LAST_PRINTABLE_CODE: u8 = b'~' - CHAR_OFFSET;
 
+// Save data (the hero's name) uses one 16-bit code per character, ended by 0x0000 or 0xFFFF.
+pub fn decode_save_string(bytes: &[u8]) -> Option<String> {
+    let text: String = bytes
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|pair| u16::from_le_bytes(*pair))
+        .take_while(|&code| code != 0x0000 && code != 0xFFFF)
+        .map(|code| u8::try_from(code).map_or('?', decode_char))
+        .collect();
+    (!text.is_empty()).then_some(text)
+}
+
 pub fn decode_table_string(bytes: &[u8]) -> Option<String> {
     let body = bytes.strip_prefix(&START_MARK).unwrap_or(bytes);
     let text: String = body
@@ -37,6 +50,12 @@ mod tests {
             decode_table_string(&pyro_jack).as_deref(),
             Some("Pyro Jack")
         );
+    }
+
+    #[test]
+    fn decodes_the_heros_name_from_save_data() {
+        let bbb = [0x23, 0x00, 0x23, 0x00, 0x23, 0x00, 0x00, 0x00];
+        assert_eq!(decode_save_string(&bbb).as_deref(), Some("BBB"));
     }
 
     #[test]

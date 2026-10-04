@@ -1,0 +1,602 @@
+diff --git a/src/GPU.h b/src/GPU.h
+index b0e1faf1..2534a085 100644
+--- a/src/GPU.h
++++ b/src/GPU.h
+@@ -828,8 +828,21 @@ struct RendererSettings
+ 
+     // "improved polygon splitting" (regular OpenGL renderer)
+     bool BetterPolygons;
++
++    // 16:9 output for the regular OpenGL renderer: 3D is drawn 4/3 wider and the 2D layers stay
++    // 4:3 in the middle (see GPU3D::WideScreen)
++    bool WideScreen = false;
+ };
+ 
++// Width of a widescreen output in DS pixels, and where the original 256 pixels start inside it.
++constexpr float WideScreenWidthDS = 256.f * 4.f / 3.f;
++constexpr float WideScreenOffsetDS = (WideScreenWidthDS - 256.f) / 2.f;
++
++inline int OutputWidthFor(int scale, bool wide)
++{
++    return wide ? (256 * scale * 4 + 1) / 3 : 256 * scale;
++}
++
+ class Renderer
+ {
+ public:
+diff --git a/src/GPU2D_OpenGL.cpp b/src/GPU2D_OpenGL.cpp
+index b823658e..2fe78f02 100644
+--- a/src/GPU2D_OpenGL.cpp
++++ b/src/GPU2D_OpenGL.cpp
+@@ -154,6 +154,8 @@ bool GLRenderer2D::InitShaders()
+     glUniformBlockBinding(CompositorShader, uniloc, 23);
+ 
+     CompositorScaleULoc = glGetUniformLocation(CompositorShader, "uScaleFactor");
++    CompositorWideWidthULoc = glGetUniformLocation(CompositorShader, "uWideWidth");
++    CompositorWideOffsetULoc = glGetUniformLocation(CompositorShader, "uWideOffset");
+ 
+     // generate mosaic lookup texture
+ 
+@@ -191,6 +193,8 @@ bool GLRenderer2D::InitShaders(GLRenderer2D& other)
+     LayerPreCurBGULoc = other.LayerPreCurBGULoc;
+     SpriteRenderTransULoc = other.SpriteRenderTransULoc;
+     CompositorScaleULoc = other.CompositorScaleULoc;
++    CompositorWideWidthULoc = other.CompositorWideWidthULoc;
++    CompositorWideOffsetULoc = other.CompositorWideOffsetULoc;
+ 
+     MosaicTex = other.MosaicTex;
+ 
+@@ -449,19 +453,24 @@ void GLRenderer2D::PostSavestate()
+ }
+ 
+ 
+-void GLRenderer2D::SetScaleFactor(int scale)
++void GLRenderer2D::SetScaleFactor(int scale, bool widescreen)
+ {
+-    if (scale == ScaleFactor)
++    if (scale == ScaleFactor && widescreen == WideScreen)
+         return;
+ 
+     ScaleFactor = scale;
++    WideScreen = widescreen;
+     ScreenW = 256 * scale;
+     ScreenH = 192 * scale;
++    // Layers keep their 256-wide textures; only the composited output widens.
++    OutputW = OutputWidthFor(scale, widescreen);
+ 
+     const GLenum fbassign2[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+ 
+     glUseProgram(CompositorShader);
+     glUniform1i(CompositorScaleULoc, ScaleFactor);
++    glUniform1f(CompositorWideWidthULoc, widescreen ? WideScreenWidthDS : 256.f);
++    glUniform1f(CompositorWideOffsetULoc, widescreen ? WideScreenOffsetDS : 0.f);
+ 
+     glBindTexture(GL_TEXTURE_2D_ARRAY, OBJLayerTex);
+     glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA, ScreenW, ScreenH, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+@@ -476,7 +485,7 @@ void GLRenderer2D::SetScaleFactor(int scale)
+     glDrawBuffers(2, fbassign2);
+ 
+     glBindTexture(GL_TEXTURE_2D, OutputTex);
+-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, ScreenW, ScreenH, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
++    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, OutputW, ScreenH, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+ 
+     glBindFramebuffer(GL_FRAMEBUFFER, OutputFB);
+     glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, OutputTex, 0);
+@@ -1764,10 +1773,10 @@ void GLRenderer2D::RenderScreen(int ystart, int yend)
+     glColorMaski(0, GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+     glDepthMask(GL_FALSE);
+ 
+-    glViewport(0, 0, ScreenW, ScreenH);
++    glViewport(0, 0, OutputW, ScreenH);
+ 
+     glEnable(GL_SCISSOR_TEST);
+-    glScissor(0, ystart * ScaleFactor, ScreenW, (yend-ystart) * ScaleFactor);
++    glScissor(0, ystart * ScaleFactor, OutputW, (yend-ystart) * ScaleFactor);
+ 
+     if (ForcedBlank || !UnitEnabled)
+     {
+diff --git a/src/GPU2D_OpenGL.h b/src/GPU2D_OpenGL.h
+index 20744dcf..f43621ff 100644
+--- a/src/GPU2D_OpenGL.h
++++ b/src/GPU2D_OpenGL.h
+@@ -41,7 +41,7 @@ public:
+ 
+     void PostSavestate();
+ 
+-    void SetScaleFactor(int scale);
++    void SetScaleFactor(int scale, bool widescreen = false);
+ 
+     void DrawScanline(u32 line) override;
+     void DrawSprites(u32 line) override;
+@@ -54,6 +54,8 @@ private:
+ 
+     int ScaleFactor {};
+     int ScreenW {}, ScreenH {};
++    bool WideScreen {};
++    int OutputW {};
+ 
+     GLuint LayerPreShader {};
+     GLint LayerPreCurBGULoc {};
+@@ -75,6 +77,8 @@ private:
+     GLuint CompositorShader {};
+     GLuint CompositorConfigUBO {};
+     GLint CompositorScaleULoc {};
++    GLint CompositorWideWidthULoc {};
++    GLint CompositorWideOffsetULoc {};
+ 
+     // base index for a BG layer within the BG texture arrays
+     // based on BG type and size
+diff --git a/src/GPU3D.cpp b/src/GPU3D.cpp
+index 3272a349..8c35e322 100644
+--- a/src/GPU3D.cpp
++++ b/src/GPU3D.cpp
+@@ -932,6 +932,74 @@ bool ClipCoordsEqual(Vertex* a, Vertex* b)
+            a->Position[3] == b->Position[3];
+ }
+ 
++// Strange Journey draws its interface with flat (orthographic) polygons. In widescreen:
++// - the status bar's corner blocks, the moon phase on the left and SEARCH/ANALYZE on the right, move
++//   out to the edges of the wider picture; the middle of the bar stays put;
++// - the battle command menu (COMMANDS header, command rows and the submenu beside them) moves to the
++//   left edge and down, clear of the moon block. It is recognised by its header and by row-sized polygons, which
++//   keeps enemy sprites (also flat, but taller) and other screens' windows in place.
++// Bounds are in 4:3 DS pixels, found by logging the polygons of dungeon and battle frames.
++void GPU3D::PegWideScreenHud(int nverts) noexcept
++{
++    constexpr float barTopMaxY = 4.f, barBottomMaxY = 26.f;
++    constexpr float leftBlockMaxX = 75.f, rightBlockMinX = 181.f;
++    constexpr float menuTopY = 15.f, menuBottomY = 101.f, menuRowMaxHeight = 16.f, menuMaxX0 = 194.f;
++    // 12 rows down puts the COMMANDS header under the moon block and keeps the last row above the
++    // description box at row 115
++    constexpr s32 menuDropRows = 12;
++
++    s32 w = TempVertexBuffer[0].Position[3];
++    if (w <= 0)
++        return;
++    for (int i = 1; i < nverts; i++)
++        if (TempVertexBuffer[i].Position[3] != w)
++            return;
++
++    float x0 = 1e9f, x1 = -1e9f, y0 = 1e9f, y1 = -1e9f;
++    for (int i = 0; i < nverts; i++)
++    {
++        // undo the 3/4 squeeze to get back to 4:3 screen pixels
++        float x = ((float)TempVertexBuffer[i].Position[0] / w * 4.f / 3.f + 1.f) * 128.f;
++        float y = (1.f - (float)TempVertexBuffer[i].Position[1] / w) * 96.f;
++        x0 = std::min(x0, x); x1 = std::max(x1, x);
++        y0 = std::min(y0, y); y1 = std::max(y1, y);
++    }
++    // a quarter of w in squeezed clip space is exactly the widescreen side margin
++    s32 shift = 0, drop = 0;
++    if (y0 <= barTopMaxY && y1 <= barBottomMaxY)
++    {
++        if (x1 <= leftBlockMaxX)
++            shift = -w / 4;
++        else if (x0 >= rightBlockMinX)
++            shift = w / 4;
++    }
++    else
++    {
++        bool menuHeader = x0 <= 1.f && std::abs(y0 - 16.f) <= 1.f && std::abs(y1 - 24.f) <= 1.f;
++        if (menuHeader)
++            MenuSeenThisFrame = true;
++        bool menuVisible = MenuSeenThisFrame || MenuSeenLastFrame;
++        // battle sprites are flat too, but sit behind the camera plane (z > 0) while the interface
++        // is drawn in front of it
++        bool inFront = TempVertexBuffer[0].Position[2] < 0;
++        bool menuRow = inFront && y0 >= menuTopY && y1 <= menuBottomY
++            && (y1 - y0) <= menuRowMaxHeight && x0 < menuMaxX0;
++        if (menuVisible && menuRow)
++        {
++            shift = -w / 4;
++            // clip-space y runs up from -w to w over 192 rows
++            drop = -(w * menuDropRows) / 96;
++        }
++    }
++    if (shift == 0)
++        return;
++    for (int i = 0; i < nverts; i++)
++    {
++        TempVertexBuffer[i].Position[0] += shift;
++        TempVertexBuffer[i].Position[1] += drop;
++    }
++}
++
+ void GPU3D::SubmitPolygon() noexcept
+ {
+     Vertex clippedvertices[10];
+@@ -942,6 +1010,9 @@ void GPU3D::SubmitPolygon() noexcept
+     int nverts = PolygonMode & 0x1 ? 4:3;
+     int prev, next;
+ 
++    if (WideScreen)
++        PegWideScreenHud(nverts);
++
+     // submitting a polygon starts the polygon pipeline
+     // noting that for now we are only reserving one vertex slot
+     // further slots only get reserved if the polygon makes it through culling/clipping
+@@ -1347,6 +1418,8 @@ void GPU3D::SubmitVertex() noexcept
+     vertextrans->Position[1] = (vertex[0]*ClipMatrix[1] + vertex[1]*ClipMatrix[5] + vertex[2]*ClipMatrix[9] + vertex[3]*ClipMatrix[13]) >> 12;
+     vertextrans->Position[2] = (vertex[0]*ClipMatrix[2] + vertex[1]*ClipMatrix[6] + vertex[2]*ClipMatrix[10] + vertex[3]*ClipMatrix[14]) >> 12;
+     vertextrans->Position[3] = (vertex[0]*ClipMatrix[3] + vertex[1]*ClipMatrix[7] + vertex[2]*ClipMatrix[11] + vertex[3]*ClipMatrix[15]) >> 12;
++    if (WideScreen)
++        vertextrans->Position[0] = (vertextrans->Position[0] * 3) / 4;
+ 
+     // this probably shouldn't be.
+     // the way color is handled during clipping needs investigation. TODO
+@@ -2493,6 +2566,8 @@ void GPU3D::VBlank() noexcept
+             NumVertices = 0;
+             NumPolygons = 0;
+             NumOpaquePolygons = 0;
++            MenuSeenLastFrame = MenuSeenThisFrame;
++            MenuSeenThisFrame = false;
+ 
+             FlushRequest = 0;
+         }
+diff --git a/src/GPU3D.h b/src/GPU3D.h
+index 73eff2ff..ba0b6766 100644
+--- a/src/GPU3D.h
++++ b/src/GPU3D.h
+@@ -137,6 +137,14 @@ private:
+     void StallPolygonPipeline(s32 delay, s32 nonstalldelay) noexcept;
+     void SubmitPolygon() noexcept;
+     void SubmitVertex() noexcept;
++public:
++    // Squeezes rendered geometry horizontally by 3/4 so a 4/3 wider target shows a 16:9 view.
++    // Box, position and vector tests keep the real matrices, so game logic sees no change.
++    bool WideScreen = false;
++private:
++    void PegWideScreenHud(int nverts) noexcept;
++    bool MenuSeenThisFrame = false;
++    bool MenuSeenLastFrame = false;
+     void CalculateLighting() noexcept;
+     void BoxTest(const u32* params) noexcept;
+     void PosTest() noexcept;
+diff --git a/src/GPU3D_OpenGL.cpp b/src/GPU3D_OpenGL.cpp
+index 7bd208b6..f67b09f6 100644
+--- a/src/GPU3D_OpenGL.cpp
++++ b/src/GPU3D_OpenGL.cpp
+@@ -324,26 +324,27 @@ void GLRenderer3D::Reset()
+ 
+ void GLRenderer3D::SetBetterPolygons(bool betterpolygons) noexcept
+ {
+-    SetRenderSettings(ScaleFactor, betterpolygons);
++    SetRenderSettings(ScaleFactor, betterpolygons, WideScreen);
+ }
+ 
+ void GLRenderer3D::SetScaleFactor(int scale) noexcept
+ {
+-    SetRenderSettings(scale, BetterPolygons);
++    SetRenderSettings(scale, BetterPolygons, WideScreen);
+ }
+ 
+ 
+-void GLRenderer3D::SetRenderSettings(int scale, bool betterpolygons) noexcept
++void GLRenderer3D::SetRenderSettings(int scale, bool betterpolygons, bool widescreen) noexcept
+ {
+-    if (betterpolygons == BetterPolygons && scale == ScaleFactor)
++    if (betterpolygons == BetterPolygons && scale == ScaleFactor && widescreen == WideScreen)
+         return;
+ 
+     // TODO set it for 2D renderer
+     //CurGLCompositor.SetScaleFactor(scale);
+     ScaleFactor = scale;
+     BetterPolygons = betterpolygons;
++    WideScreen = widescreen;
+ 
+-    ScreenW = 256 * scale;
++    ScreenW = OutputWidthFor(scale, widescreen);
+     ScreenH = 192 * scale;
+ 
+     glBindTexture(GL_TEXTURE_2D, ColorBufferTex);
+@@ -442,6 +443,7 @@ u32* GLRenderer3D::SetupVertex(const Polygon* poly, int vid, const Vertex* vtx,
+         x = vtx->FinalPosition[0];
+         y = vtx->FinalPosition[1];
+     }
++    x = WidenX(x);
+ 
+     // correct nearly-vertical edges that would look vertical on the DS
+     /*{
+@@ -701,7 +703,7 @@ void GLRenderer3D::BuildPolygons(GLRenderer3D::RendererPolygon* polygons, int np
+                 cS *= cW;
+                 cT *= cW;
+ 
+-                cX = (cX * ScaleFactor) >> 4;
++                cX = WidenX((cX * ScaleFactor) >> 4);
+                 cY = (cY * ScaleFactor) >> 4;
+ 
+                 u32 w = (u32)cW;
+diff --git a/src/GPU3D_OpenGL.h b/src/GPU3D_OpenGL.h
+index 29356ef9..3baebd69 100644
+--- a/src/GPU3D_OpenGL.h
++++ b/src/GPU3D_OpenGL.h
+@@ -36,7 +36,7 @@ public:
+     bool Init() override;
+     void Reset() override;
+ 
+-    void SetRenderSettings(int scale, bool betterpolygons) noexcept;
++    void SetRenderSettings(int scale, bool betterpolygons, bool widescreen = false) noexcept;
+     void SetBetterPolygons(bool betterpolygons) noexcept;
+     void SetScaleFactor(int scale) noexcept;
+     [[nodiscard]] bool GetBetterPolygons() const noexcept { return BetterPolygons; }
+@@ -156,6 +156,8 @@ private:
+ 
+     int ScaleFactor {};
+     bool BetterPolygons {};
++    bool WideScreen {};
++    u32 WidenX(u32 x) const noexcept { return WideScreen ? (x * 4) / 3 : x; }
+     int ScreenW {}, ScreenH {};
+ 
+     GLuint ColorBufferTex {}, DepthBufferTex {}, AttrBufferTex {};
+diff --git a/src/GPU_OpenGL.cpp b/src/GPU_OpenGL.cpp
+index 48533694..8b19f185 100644
+--- a/src/GPU_OpenGL.cpp
++++ b/src/GPU_OpenGL.cpp
+@@ -283,6 +283,7 @@ void GLRenderer::Reset()
+ {
+     memset(&FinalPassConfig, 0, sizeof(FinalPassConfig));
+     memset(&CaptureConfig, 0, sizeof(CaptureConfig));
++    ApplyWideScreenConfig();
+ 
+     AuxUsageMask = 0;
+ 
+@@ -321,13 +322,16 @@ void GLRenderer::PostSavestate()
+ 
+ void GLRenderer::SetRenderSettings(RendererSettings& settings)
+ {
+-    SetScaleFactor(settings.ScaleFactor);
++    // widescreen needs the regular renderer's vertex path
++    bool wide = settings.WideScreen && !IsCompute;
++    GPU.GPU3D.WideScreen = wide;
++    SetScaleFactor(settings.ScaleFactor, wide);
+ 
+     auto rend2d = dynamic_cast<GLRenderer2D*>(Rend2D_A.get());
+-    rend2d->SetScaleFactor(settings.ScaleFactor);
++    rend2d->SetScaleFactor(settings.ScaleFactor, wide);
+ 
+     rend2d = dynamic_cast<GLRenderer2D*>(Rend2D_B.get());
+-    rend2d->SetScaleFactor(settings.ScaleFactor);
++    rend2d->SetScaleFactor(settings.ScaleFactor, wide);
+ 
+     if (IsCompute)
+     {
+@@ -337,18 +341,30 @@ void GLRenderer::SetRenderSettings(RendererSettings& settings)
+     else
+     {
+         auto rend3d = dynamic_cast<GLRenderer3D *>(Rend3D.get());
+-        rend3d->SetRenderSettings(settings.ScaleFactor, settings.BetterPolygons);
++        rend3d->SetRenderSettings(settings.ScaleFactor, settings.BetterPolygons, wide);
+     }
+ }
+ 
+ 
+-void GLRenderer::SetScaleFactor(int scale)
++// Reset() clears both configs, so this runs again after every reset and savestate load.
++void GLRenderer::ApplyWideScreenConfig()
+ {
+-    if (scale == ScaleFactor)
++    FinalPassConfig.uWideWidth = WideScreen ? WideScreenWidthDS : 256.f;
++    FinalPassConfig.uWideOffset = WideScreen ? WideScreenOffsetDS : 0.f;
++    // capture reads the middle 256 columns of the (possibly wider) 2D and 3D outputs
++    CaptureConfig.uSrcAScaleX = 256.f / FinalPassConfig.uWideWidth;
++    CaptureConfig.uSrcABiasX = FinalPassConfig.uWideOffset / FinalPassConfig.uWideWidth;
++}
++
++void GLRenderer::SetScaleFactor(int scale, bool widescreen)
++{
++    if (scale == ScaleFactor && widescreen == WideScreen)
+         return;
+ 
+     ScaleFactor = scale;
+-    ScreenW = 256 * scale;
++    WideScreen = widescreen;
++    ScreenW = OutputWidthFor(scale, widescreen);
++    ApplyWideScreenConfig();
+     ScreenH = 192 * scale;
+ 
+     const GLenum fbassign2[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+diff --git a/src/GPU_OpenGL.h b/src/GPU_OpenGL.h
+index 5fa2db82..1b2bf5e1 100644
+--- a/src/GPU_OpenGL.h
++++ b/src/GPU_OpenGL.h
+@@ -63,6 +63,7 @@ private:
+     bool IsCompute {};
+ 
+     int ScaleFactor {};
++    bool WideScreen {};
+     int ScreenW {}, ScreenH {};
+ 
+     GLuint RectVtxBuffer {};
+@@ -83,7 +84,9 @@ private:
+         u32 uBrightFactorA;
+         u32 uBrightFactorB;
+         float uAuxColorFactor;
+-        u32 __pad0[3];
++        float uWideWidth;
++        float uWideOffset;
++        u32 __pad0[1];
+     } FinalPassConfig {};
+ 
+     GLuint FPShader {};
+@@ -111,7 +114,9 @@ private:
+         u32 uBlendFactors[2];
+         float uSrcAOffset[192];
+         float uSrcBColorFactor;
+-        u32 __pad0[3];
++        float uSrcAScaleX;
++        float uSrcABiasX;
++        u32 __pad0[1];
+     } CaptureConfig {};
+ 
+     GLuint CaptureShader {};
+@@ -143,7 +148,8 @@ private:
+     int LastCapLine {};
+     int Aux0VRAMCap {};
+ 
+-    void SetScaleFactor(int scale);
++    void SetScaleFactor(int scale, bool widescreen = false);
++    void ApplyWideScreenConfig();
+ 
+     void RenderScreen(int ystart, int yend);
+     void DoCapture(int ystart, int yend);
+diff --git a/src/OpenGL_shaders/2DCompositorFS.glsl b/src/OpenGL_shaders/2DCompositorFS.glsl
+index 1de6ef04..47dae0ea 100644
+--- a/src/OpenGL_shaders/2DCompositorFS.glsl
++++ b/src/OpenGL_shaders/2DCompositorFS.glsl
+@@ -50,7 +50,8 @@ layout(std140) uniform ubCompositorConfig
+ };
+ 
+ uniform int uScaleFactor;
+-
++uniform float uWideWidth;
++uniform float uWideOffset;
+ smooth in vec4 fTexcoord;
+ 
+ out vec4 oColor;
+@@ -96,6 +97,12 @@ vec4 BG0CalcAndFetch(vec2 coord, int line)
+         bgpos = floor(bgpos) - vec2(MosaicX, 0);
+     }
+ 
++    if (uEnable3D)
++    {
++        // the 3D layer spans the whole output, wider than 256 in widescreen
++        return BG0Fetch(vec2((bgpos.x + uWideOffset) / uWideWidth, bgpos.y / 192.0));
++    }
++
+     return BG0Fetch(bgpos / vec2(uBGConfig[0].Size));
+ }
+ 
+@@ -242,12 +249,15 @@ void CalcSpriteMosaic(in ivec2 coord, out ivec4 objflags, out vec4 objcolor)
+ 
+ vec4 CompositeLayers()
+ {
++    // In widescreen, pixels left and right of the 256 DS columns only show the 3D layer and the
++    // backdrop; window state is taken from the nearest edge column.
++    bool outside = (fTexcoord.x < 0.0) || (fTexcoord.x >= 256.0);
+     ivec2 coord = ivec2(fTexcoord.zw);
+     vec2 bgcoord = vec2(fTexcoord.x, fract(fTexcoord.y));
+-    int xpos = int(fTexcoord.x);
++    int xpos = clamp(int(floor(fTexcoord.x)), 0, 255);
+     int line = int(fTexcoord.y);
+ 
+-    if (uScanline[line].MosaicSize.x > 0)
++    if (uScanline[line].MosaicSize.x > 0 && !outside)
+         MosaicX = texelFetch(MosaicTex, ivec2(bgcoord.x, uScanline[line].MosaicSize.x), 0).r;
+ 
+     ivec4 col1 = ivec4(ConvertColor(uScanline[line].BackColor), 0x20);
+@@ -263,7 +273,18 @@ vec4 CompositeLayers()
+     layercol[3] = BG3CalcAndFetch(bgcoord, line);
+ 
+     ivec4 objflags;
+-    if (uScanline[line].MosaicSize.z > 0)
++    if (outside)
++    {
++        if (!uEnable3D)
++            layercol[0] = vec4(0);
++        layercol[1] = vec4(0);
++        layercol[2] = vec4(0);
++        layercol[3] = vec4(0);
++        layercol[4] = vec4(0);
++        layercol[5] = vec4(0);
++        objflags = ivec4(0);
++    }
++    else if (uScanline[line].MosaicSize.z > 0)
+     {
+         CalcSpriteMosaic(ivec2(fTexcoord.xy), objflags, layercol[4]);
+     }
+diff --git a/src/OpenGL_shaders/2DCompositorVS.glsl b/src/OpenGL_shaders/2DCompositorVS.glsl
+index 48e10ea6..1cd045d0 100644
+--- a/src/OpenGL_shaders/2DCompositorVS.glsl
++++ b/src/OpenGL_shaders/2DCompositorVS.glsl
+@@ -1,6 +1,8 @@
+ #version 140
+ 
+ uniform int uScaleFactor;
++uniform float uWideWidth;   // output width in DS pixels: 256, or more in widescreen
++uniform float uWideOffset;  // where DS pixel 0 sits in the output
+ 
+ in vec2 vPosition;
+ 
+@@ -9,6 +11,6 @@ smooth out vec4 fTexcoord;
+ void main()
+ {
+     gl_Position = vec4((vPosition * 2) - 1, 0, 1);
+-    fTexcoord.xy = vPosition * vec2(256, 192);
++    fTexcoord.xy = vPosition * vec2(uWideWidth, 192) - vec2(uWideOffset, 0);
+     fTexcoord.zw = fTexcoord.xy * uScaleFactor;
+ }
+diff --git a/src/OpenGL_shaders/CaptureFS.glsl b/src/OpenGL_shaders/CaptureFS.glsl
+index ba31f873..cb75500f 100644
+--- a/src/OpenGL_shaders/CaptureFS.glsl
++++ b/src/OpenGL_shaders/CaptureFS.glsl
+@@ -13,6 +13,8 @@ layout(std140) uniform ubCaptureConfig
+     ivec2 uBlendFactors;
+     vec4 uSrcAOffset[48];
+     float uSrcBColorFactor;
++    float uSrcAScaleX;
++    float uSrcABiasX;
+ };
+ 
+ smooth in vec4 fTexcoord;
+@@ -41,6 +43,7 @@ void main()
+         coordA.x += uSrcAOffset[line>>2][line&0x3];
+         //coordA.x += GetSrcAPos(fTexcoord.z);
+     }
++    coordA.x = coordA.x * uSrcAScaleX + uSrcABiasX;
+ 
+     if (uDstMode == 0)
+     {
+diff --git a/src/OpenGL_shaders/CaptureVS.glsl b/src/OpenGL_shaders/CaptureVS.glsl
+index e6564597..f9f845b3 100644
+--- a/src/OpenGL_shaders/CaptureVS.glsl
++++ b/src/OpenGL_shaders/CaptureVS.glsl
+@@ -10,6 +10,8 @@ layout(std140) uniform ubCaptureConfig
+     ivec2 uBlendFactors;
+     vec4 uSrcAOffset[48];
+     float uSrcBColorFactor;
++    float uSrcAScaleX;
++    float uSrcABiasX;
+ };
+ 
+ in ivec2 vPosition;
+diff --git a/src/OpenGL_shaders/FinalPassFS.glsl b/src/OpenGL_shaders/FinalPassFS.glsl
+index bfbb2d93..3699dd98 100644
+--- a/src/OpenGL_shaders/FinalPassFS.glsl
++++ b/src/OpenGL_shaders/FinalPassFS.glsl
+@@ -16,6 +16,8 @@ layout(std140) uniform ubFinalPassConfig
+     int uBrightFactorA;
+     int uBrightFactorB;
+     float uAuxColorFactor;
++    float uWideWidth;
++    float uWideOffset;
+ };
+ 
+ smooth in vec3 fTexcoord;
+@@ -58,8 +60,12 @@ void main()
+     }
+     else
+     {
+-        // VRAM display / mainmem FIFO
+-        output_main = ivec3(texture(AuxInputTex, vec3(fTexcoord.xz, uAuxLayer)).rgb * uAuxColorFactor);
++        // VRAM display / mainmem FIFO: a 256-wide bitmap, centred in widescreen
++        float auxX = (fTexcoord.x * uWideWidth - uWideOffset) / 256.0;
++        if (auxX < 0.0 || auxX >= 1.0)
++            output_main = ivec3(0);
++        else
++            output_main = ivec3(texture(AuxInputTex, vec3(auxX, fTexcoord.z, uAuxLayer)).rgb * uAuxColorFactor);
+     }
+ 
+     if (uDispModeB == 0)
+diff --git a/src/OpenGL_shaders/FinalPassVS.glsl b/src/OpenGL_shaders/FinalPassVS.glsl
+index 230a917f..6879f5a6 100644
+--- a/src/OpenGL_shaders/FinalPassVS.glsl
++++ b/src/OpenGL_shaders/FinalPassVS.glsl
+@@ -12,6 +12,8 @@ layout(std140) uniform ubFinalPassConfig
+     int uBrightFactorA;
+     int uBrightFactorB;
+     float uAuxColorFactor;
++    float uWideWidth;
++    float uWideOffset;
+ };
+ 
+ in vec2 vPosition;

@@ -60,7 +60,12 @@ impl PixelCanvas<'_> {
 
     // The game's panel border: navy edge, blue line, black line, top-left corner cut at 45°.
     pub fn frame(&self, width: u32, height: u32) {
-        for (layer, colour) in [FRAME_OUTER, FRAME_BLUE, BLACK].into_iter().enumerate() {
+        self.frame_with(width, height, FRAME_BLUE);
+    }
+
+    // Same border with another middle line, such as the red one the game puts round a selection.
+    pub fn frame_with(&self, width: u32, height: u32, line: Color32) {
+        for (layer, colour) in [FRAME_OUTER, line, BLACK].into_iter().enumerate() {
             let layer = layer as u32;
             let (inner_width, inner_height) = (width - 2 * layer, height - 2 * layer);
             for row in 0..inner_height {

@@ -14,11 +14,19 @@ pub fn mouse_to_bottom_screen(pip: RectPx, mouse_x: i32, mouse_y: i32) -> Option
 }
 
 // The core runs with its "top-bottom" layout and no gap, so the libretro pointer space covers a
-// 256x384 surface whose lower half is the touch screen. We aim at pixel centres so the core's
+// 256x384 surface whose lower half is the touch screen. In widescreen the surface is 4/3 wider
+// and the touch screen sits centred in it, 256/6 pixels in. We aim at pixel centres so the core's
 // truncating inverse lands on the same pixel.
-pub fn bottom_screen_to_pointer(screen_x: u32, screen_y: u32) -> (i16, i16) {
+pub fn bottom_screen_to_pointer(screen_x: u32, screen_y: u32, wide_frame: bool) -> (i16, i16) {
     let surface_height_px = NDS_SCREEN_HEIGHT_PX * 2;
-    let pointer_x = to_pointer_axis(screen_x, NDS_SCREEN_WIDTH_PX);
+    let pointer_x = if wide_frame {
+        let width_px = f64::from(NDS_SCREEN_WIDTH_PX) * 4.0 / 3.0;
+        let offset_px = f64::from(NDS_SCREEN_WIDTH_PX) / 6.0;
+        let fraction = (offset_px + f64::from(screen_x) + 0.5) / width_px;
+        (f64::from(POINTER_MIN) + fraction * f64::from(POINTER_SPAN)) as i16
+    } else {
+        to_pointer_axis(screen_x, NDS_SCREEN_WIDTH_PX)
+    };
     let pointer_y = to_pointer_axis(NDS_SCREEN_HEIGHT_PX + screen_y, surface_height_px);
     (pointer_x, pointer_y)
 }
@@ -64,12 +72,25 @@ mod tests {
     #[test]
     fn every_bottom_screen_pixel_round_trips_through_core_pointer_space() {
         for (x, y) in [(0, 0), (255, 191), (128, 96), (17, 140)] {
-            let (pointer_x, pointer_y) = bottom_screen_to_pointer(x, y);
+            let (pointer_x, pointer_y) = bottom_screen_to_pointer(x, y, false);
             assert_eq!(core_inverse(pointer_x, NDS_SCREEN_WIDTH_PX), x);
             assert_eq!(
                 core_inverse(pointer_y, NDS_SCREEN_HEIGHT_PX * 2),
                 NDS_SCREEN_HEIGHT_PX + y
             );
+        }
+    }
+
+    // The core maps the pointer over the whole wide surface, then removes the bottom screen's offset.
+    #[test]
+    fn widescreen_touches_land_on_the_centred_bottom_screen() {
+        let scale = 3;
+        let width_px = NDS_SCREEN_WIDTH_PX * scale * 4 / 3;
+        let offset_px = NDS_SCREEN_WIDTH_PX * scale / 6;
+        for x in [0, 17, 128, 255] {
+            let (pointer_x, _) = bottom_screen_to_pointer(x, 96, true);
+            let surface_x = core_inverse(pointer_x, width_px);
+            assert_eq!((surface_x - offset_px) / scale, x);
         }
     }
 }

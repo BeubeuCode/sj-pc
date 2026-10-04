@@ -204,7 +204,7 @@ impl Presenter {
         &self,
         gl: &glow::Context,
         drawable_px: (u32, u32),
-        screens: &[(Screen, RectPx)],
+        screens: &[(Screen, RectPx, (f32, f32))],
         filter: ScalingFilter,
     ) {
         // SAFETY: clears the default framebuffer of the current context.
@@ -230,10 +230,15 @@ impl Presenter {
             ..top_screen
         };
         let gl_filter = gl_filter(filter);
-        for (screen, destination) in screens {
-            let source = match screen {
+        for (screen, destination, span) in screens {
+            let whole = match screen {
                 Screen::Top => top_screen,
                 Screen::Bottom => bottom_screen,
+            };
+            let source = RectPx {
+                x: (span.0 * frame.width_px as f32).round() as i32,
+                width: ((span.1 - span.0) * frame.width_px as f32).round() as u32,
+                ..whole
             };
             self.blit(gl, frame, source, *destination, drawable_px.1, gl_filter);
         }

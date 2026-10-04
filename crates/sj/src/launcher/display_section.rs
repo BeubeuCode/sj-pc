@@ -66,6 +66,10 @@ fn show_video(ui: &mut egui::Ui, video: &mut VideoSettings) {
         ui.label("Vsync");
         ui.checkbox(&mut video.vsync, "Sync to display (prevents tearing)");
         ui.end_row();
+
+        ui.label("Widescreen");
+        ui.checkbox(&mut video.widescreen, "16:9 3D in dungeons and battles");
+        ui.end_row();
     });
 }
 

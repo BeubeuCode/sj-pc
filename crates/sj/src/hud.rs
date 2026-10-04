@@ -1,6 +1,6 @@
 use egui::{pos2, Color32, Rect, TextureId};
 use sj_game::rect::RectPx;
-use sj_game::screen_director::{overlay_rect, Screen, ScreenPlan};
+use sj_game::screen_director::{overlay_rect, source_span, Screen, ScreenPlan};
 use sj_game::{NDS_SCREEN_HEIGHT_PX, NDS_SCREEN_WIDTH_PX};
 
 use crate::pixel_canvas::{PixelCanvas, FRAME_DS_PX};
@@ -19,13 +19,18 @@ pub fn draw_overlays(
     };
     let points_per_pixel = 1.0 / root.ctx().pixels_per_point();
     for overlay in &plan.overlays {
-        let rect_px = overlay_rect(drawable_px, overlay, margin_px);
+        let rect_px = overlay_rect(drawable_px, plan, overlay, margin_px);
         draw_frame_around(root, rect_px, overlay.crop, points_per_pixel);
         let alpha = (overlay.opacity.clamp(0.0, 1.0) * 255.0).round() as u8;
         root.painter().image(
             texture,
             to_points(rect_px, points_per_pixel),
-            crop_uv(frame, overlay.source, overlay.crop),
+            crop_uv(
+                frame,
+                source_span(overlay.source, plan),
+                overlay.source,
+                overlay.crop,
+            ),
             Color32::from_white_alpha(alpha),
         );
     }
@@ -54,17 +59,19 @@ fn to_points(rect: RectPx, points_per_pixel: f32) -> Rect {
 }
 
 // UVs into the presenter's colour texture for a crop given in DS pixels of one screen. The frame
-// sits at the texture's origin; bottom-up frames get flipped V coordinates.
-fn crop_uv(frame: FrameInfo, screen: Screen, crop: RectPx) -> Rect {
-    let scale_x = frame.width_px as f32 / NDS_SCREEN_WIDTH_PX as f32;
+// sits at the texture's origin; bottom-up frames get flipped V coordinates. `span` is the part of
+// the frame width holding the screen's 256 columns (its middle 3/4 in widescreen).
+fn crop_uv(frame: FrameInfo, span: (f32, f32), screen: Screen, crop: RectPx) -> Rect {
+    let span_left_px = span.0 * frame.width_px as f32;
+    let scale_x = (span.1 - span.0) * frame.width_px as f32 / NDS_SCREEN_WIDTH_PX as f32;
     let screen_height_px = frame.height_px as f32 / 2.0;
     let scale_y = screen_height_px / NDS_SCREEN_HEIGHT_PX as f32;
     let screen_top_px = match screen {
         Screen::Top => 0.0,
         Screen::Bottom => screen_height_px,
     };
-    let left = crop.x as f32 * scale_x;
-    let right = (crop.x as f32 + crop.width as f32) * scale_x;
+    let left = span_left_px + crop.x as f32 * scale_x;
+    let right = span_left_px + (crop.x as f32 + crop.width as f32) * scale_x;
     let top = screen_top_px + crop.y as f32 * scale_y;
     let bottom = screen_top_px + (crop.y as f32 + crop.height as f32) * scale_y;
     let (top_row, bottom_row) = match frame.row_order {
@@ -99,18 +106,40 @@ mod tests {
 
     #[test]
     fn whole_top_screen_of_a_top_down_frame() {
-        let uv = crop_uv(frame(RowOrder::TopDown), Screen::Top, FULL_SCREEN);
+        let uv = crop_uv(
+            frame(RowOrder::TopDown),
+            (0.0, 1.0),
+            Screen::Top,
+            FULL_SCREEN,
+        );
         assert_eq!(uv, Rect::from_min_max(pos2(0.0, 0.0), pos2(0.5, 0.375)));
     }
 
     #[test]
     fn automap_crop_of_a_bottom_up_frame_is_flipped() {
-        let uv = crop_uv(frame(RowOrder::BottomUp), Screen::Bottom, AUTOMAP_CROP);
+        let uv = crop_uv(
+            frame(RowOrder::BottomUp),
+            (0.0, 1.0),
+            Screen::Bottom,
+            AUTOMAP_CROP,
+        );
         let top_row = 768.0 - (384.0 + 32.0);
         let bottom_row = 768.0 - (384.0 + 352.0);
         assert_eq!(
             uv,
             Rect::from_min_max(pos2(0.0, top_row / 1024.0), pos2(0.5, bottom_row / 1024.0))
         );
+    }
+
+    #[test]
+    fn widescreen_crops_come_from_the_middle_of_the_frame() {
+        let uv = crop_uv(
+            frame(RowOrder::TopDown),
+            (0.125, 0.875),
+            Screen::Bottom,
+            FULL_SCREEN,
+        );
+        assert_eq!(uv.min.x, 64.0 / 1024.0);
+        assert_eq!(uv.max.x, 448.0 / 1024.0);
     }
 }

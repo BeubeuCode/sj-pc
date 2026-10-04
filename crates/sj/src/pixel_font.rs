@@ -407,6 +407,8 @@ fn name_glyph(ch: char) -> Option<&'static [u8]> {
 fn label_glyph(ch: char) -> Option<&'static [u8]> {
     let rows: &'static [u8; 5] = match ch {
         'H' => &[0b10001, 0b10001, 0b11111, 0b10001, 0b10001],
+        'L' => &[0b10000, 0b10000, 0b10000, 0b10000, 0b11111],
+        'V' => &[0b10001, 0b10001, 0b10001, 0b01010, 0b00100],
         'M' => &[0b10001, 0b11011, 0b11111, 0b10101, 0b10001],
         'P' => &[0b11110, 0b10010, 0b11110, 0b10000, 0b10000],
         _ => return None,
@@ -443,7 +445,7 @@ mod tests {
                 7,
                 "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-.'? ",
             ),
-            (&LABEL, 5, "HMP"),
+            (&LABEL, 5, "HLMPV"),
             (&DIGITS, 5, "0123456789"),
         ] {
             for ch in chars.chars() {

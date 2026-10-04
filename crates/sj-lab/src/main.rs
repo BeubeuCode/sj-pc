@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use sj_emu::{Core, CoreConfig, Frame, Pointer};
+use sj_game::addr::Arm9Addr;
 use sj_game::core_options::{core_variables, Renderer};
 use sj_game::game_api::GameApi;
 use sj_game::game_mode;
@@ -72,6 +73,7 @@ impl Lab {
             Step::Snapshot { label } => self.snapshot(label),
             Step::SaveState { path } => self.save_state(path),
             Step::LoadState { path } => self.load_state(path),
+            Step::Poke32 { addr, value } => self.poke32(*addr, *value),
             timed => {
                 for mask in frame_masks(timed) {
                     self.run_frame(mask);
@@ -79,6 +81,16 @@ impl Lab {
                 Ok(())
             }
         }
+    }
+
+    // Research only: lets a script test a value change, such as a patch candidate, before it
+    // becomes a real `Patch`.
+    fn poke32(&mut self, addr: Arm9Addr, value: u32) -> Result<(), String> {
+        let offset = addr
+            .main_ram_offset(4)
+            .ok_or_else(|| format!("{addr} is outside main RAM"))?;
+        self.core.main_ram_mut()[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+        Ok(())
     }
 
     fn run_frame(&mut self, joypad_mask: u16) {

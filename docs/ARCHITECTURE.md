@@ -39,7 +39,7 @@ capture and the game, so a binding captured in the launcher always matches in ga
 ## Screen director
 Each frame the app reads the game mode (`sj_game::game_mode`, from the scene flags at `0x0216AB60`)
 and asks `sj_game::screen_director::plan` what to show:
-- **Dungeon** (scene flags `0x0000` like the title, plus the dungeon bit at `0x0216B44C`): top screen
+- **Dungeon** (scene flags `0x0000` like the title, with the dungeon scene running: update function `0x0203034C` at current scene `+0x08`): top screen
   fills the view, with the automap cropped from the bottom screen as a minimap in the game's panel
   frame, below the game's header bar. It hides while a dialogue box is open (`0x0216B9AC` non-null).
 - **Ship scenes (`0x0400`)** and **ship rooms (facility):** top screen only. Rooms are picked from a menu, so the room map is no use
@@ -48,12 +48,26 @@ and asks `sj_game::screen_director::plan` what to show:
 - **Battle (`0x0200`):** top screen only, plus native enemy panels (`sj_game::battle` reads the
   unit table, `battle_hud.rs` draws them as pixel art in the game's party-panel style with
   `pixel_canvas.rs` and our own proportional `pixel_font.rs` glyphs). Names come from the game's loaded
-  name table; repeated demons get letters ("Slime A", "Slime B"). They sit in the right side bar when the
+  name table; repeated demons get letters ("Slime A", "Slime B"). Below HP and MP a card lists the
+  race, the non-normal affinities ("Wk Fire Expel") and the skills (`sj_game::demon_data` reads the
+  game's resident base table and string tables), so cards have different heights and the stack
+  shrinks to fit the window. They sit in the right side bar when the
   window is wider than 4:3, otherwise over the right of the image.
-- **Battle with a bottom-screen list open** (Summon): the game's bottom screen comes up framed over
-  the right of the fight and takes clicks; the enemy panels step aside.
+- **Battle bottom screen, native:** the bottom screen never shows in battle. The panels follow the
+  page the game's bottom screen is on (`battle::bottom_page`), so L and R switch them as on the DS:
+  enemies, party (hero plus the demon stock, `sj_game::stock`), Summon list (the stock, with the
+  selected demon in a red frame from `battle::list_cursor`). With widescreen 3D the panels live in the
+  strip widescreen adds on the right, so they never cover the game's own boxes. In widescreen
+  the core also moves the status bar corners and the command menu to the screen edges
+  (`docs/re/WIDESCREEN.md`).
 - **Cinematics:** top screen only.
 - **Swap** (M, right-stick click) shows the bottom screen alone until pressed again.
+
+**Widescreen.** With our patched core, both screens come out 4/3 wider: 3D fills the extra width and
+the 2D of each screen sits in the middle 3/4. The app spots wide frames by their size
+(`screen_director::is_wide_frame`), shows a lone top screen at 16:9 and takes the 4:3 middle
+everywhere else (`source_span`): the bottom screen, the two-screen menus and the HUD crops. Touch aims at
+the bottom screen's centred place in the wide surface (`touch::bottom_screen_to_pointer`).
 
 The `Presenter` blits the main screens. HUD overlays are drawn by egui from the same framebuffer
 texture (`hud.rs`, registered as an egui native texture), which gives cropping and opacity without
@@ -61,7 +75,8 @@ writing shaders. Touch goes to whichever bottom-screen rectangle is visible.
 
 ## Research tooling
 - `sj-lab` (dev binary) runs the core headless in software mode and plays scripts from `re/scripts/`:
-  `wait`, `press`, `hold`, `mash`, `snapshot`, `save`, `load`. It prints the detected mode per snapshot.
+  `wait`, `press`, `hold`, `mash`, `snapshot`, `save`, `load`, and `poke32 ADDR VALUE` (hex) to try a
+  RAM or code change before it becomes a `Patch`. It prints the detected mode per snapshot.
 - Snapshots (`re/samples/<label>-<n>/`, gitignored) hold the savestate, main RAM and both screens as PNG.
   F9 in the app writes the same layout.
 - F12 in the app opens the RAM search panel (value, changed, unchanged, increased, decreased, watch list).

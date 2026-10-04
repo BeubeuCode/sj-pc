@@ -45,7 +45,14 @@ pub struct Overlay {
 pub struct ScreenPlan {
     pub arrangement: Arrangement,
     pub overlays: Vec<Overlay>,
+    // The core drew 4/3 wider screens (widescreen 3D): the 2D of each screen sits in the middle 3/4.
+    pub wide_frame: bool,
 }
+
+pub const WIDE_ASPECT: f32 = 16.0 / 9.0;
+// The middle 3/4 of a wide frame holds the original 256 DS columns.
+const WIDE_CENTRE_SPAN: (f32, f32) = (0.125, 0.875);
+const FULL_SPAN: (f32, f32) = (0.0, 1.0);
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -71,11 +78,18 @@ impl Default for HudSettings {
     }
 }
 
-pub fn plan(mode: GameMode, swapped: bool, hud: &HudSettings, pip: &PipSettings) -> ScreenPlan {
+pub fn plan(
+    mode: GameMode,
+    swapped: bool,
+    hud: &HudSettings,
+    pip: &PipSettings,
+    wide_frame: bool,
+) -> ScreenPlan {
     if swapped {
         return ScreenPlan {
             arrangement: Arrangement::Single(Screen::Bottom),
             overlays: Vec::new(),
+            wide_frame,
         };
     }
     let arrangement = arrangement_for(mode);
@@ -83,17 +97,42 @@ pub fn plan(mode: GameMode, swapped: bool, hud: &HudSettings, pip: &PipSettings)
     if hud.minimap && shows_automap(mode) {
         overlays.push(minimap_overlay(hud));
     }
-    let bottom_menu = mode == (GameMode::Battle { bottom_menu: true });
-    if bottom_menu {
-        overlays.push(BOTTOM_MENU_OVERLAY);
-    }
-    if pip.visible && !bottom_menu && arrangement == Arrangement::Single(Screen::Top) {
+    if pip.visible && arrangement == Arrangement::Single(Screen::Top) {
         overlays.push(pip_overlay(pip));
     }
     ScreenPlan {
         arrangement,
         overlays,
+        wide_frame,
     }
+}
+
+// Widescreen frames are 4/3 wider than two stacked 256x192 screens.
+pub fn is_wide_frame(width_px: u32, height_px: u32) -> bool {
+    width_px * 3 > height_px * 2
+}
+
+// The top screen is shown 16:9 only when it is alone; next to the bottom screen, as in menus,
+// it shows its 4:3 middle like everything else.
+pub fn top_is_wide(plan: &ScreenPlan) -> bool {
+    plan.wide_frame && plan.arrangement == Arrangement::Single(Screen::Top)
+}
+
+// Which horizontal part of a screen's frame rows to show, as fractions of the frame width.
+pub fn source_span(screen: Screen, plan: &ScreenPlan) -> (f32, f32) {
+    if !plan.wide_frame || (screen == Screen::Top && top_is_wide(plan)) {
+        return FULL_SPAN;
+    }
+    WIDE_CENTRE_SPAN
+}
+
+fn top_image(window_px: (u32, u32), plan: &ScreenPlan) -> RectPx {
+    let aspect = if top_is_wide(plan) {
+        WIDE_ASPECT
+    } else {
+        NDS_ASPECT
+    };
+    fit_centered(window_px.0, window_px.1, aspect)
 }
 
 fn arrangement_for(mode: GameMode) -> Arrangement {
@@ -101,7 +140,7 @@ fn arrangement_for(mode: GameMode) -> Arrangement {
         GameMode::Facility
         | GameMode::ShipScene
         | GameMode::Dungeon { .. }
-        | GameMode::Battle { .. }
+        | GameMode::Battle
         | GameMode::Event => Arrangement::Single(Screen::Top),
         GameMode::Title
         | GameMode::TextEntry
@@ -116,17 +155,6 @@ fn arrangement_for(mode: GameMode) -> Arrangement {
 fn shows_automap(mode: GameMode) -> bool {
     mode == GameMode::Dungeon { dialogue: false }
 }
-
-// Lists the game draws on the bottom screen in battle (Summon) come up over the right of the fight,
-// at the size of the game's own panels, and take clicks.
-const BOTTOM_MENU_OVERLAY: Overlay = Overlay {
-    source: Screen::Bottom,
-    crop: FULL_SCREEN,
-    corner: Corner::TopRight,
-    height_fraction: 0.62,
-    opacity: 1.0,
-    accepts_touch: true,
-};
 
 fn minimap_overlay(hud: &HudSettings) -> Overlay {
     Overlay {
@@ -150,11 +178,9 @@ fn pip_overlay(pip: &PipSettings) -> Overlay {
     }
 }
 
-pub fn arrangement_rects(window_px: (u32, u32), arrangement: Arrangement) -> Vec<(Screen, RectPx)> {
-    match arrangement {
-        Arrangement::Single(screen) => {
-            vec![(screen, fit_centered(window_px.0, window_px.1, NDS_ASPECT))]
-        }
+pub fn arrangement_rects(window_px: (u32, u32), plan: &ScreenPlan) -> Vec<(Screen, RectPx)> {
+    match plan.arrangement {
+        Arrangement::Single(screen) => vec![(screen, top_image(window_px, plan))],
         Arrangement::SideBySide => {
             let both = fit_centered(window_px.0, window_px.1, NDS_ASPECT * 2.0);
             let half_width = both.width / 2;
@@ -178,8 +204,13 @@ pub const GAME_HEADER_DS_PX: f32 = 24.0;
 
 // Overlays only exist over a single screen, so they anchor to that screen's image, not the
 // window: otherwise they hang off the image onto the pillarbox bars.
-pub fn overlay_rect(window_px: (u32, u32), overlay: &Overlay, margin_px: u32) -> RectPx {
-    let screen = fit_centered(window_px.0, window_px.1, NDS_ASPECT);
+pub fn overlay_rect(
+    window_px: (u32, u32),
+    plan: &ScreenPlan,
+    overlay: &Overlay,
+    margin_px: u32,
+) -> RectPx {
+    let screen = top_image(window_px, plan);
     let height = (screen.height as f32 * overlay.height_fraction).round() as u32;
     let width =
         (height as f32 * overlay.crop.width as f32 / overlay.crop.height as f32).round() as u32;
@@ -205,39 +236,74 @@ pub fn overlay_rect(window_px: (u32, u32), overlay: &Overlay, margin_px: u32) ->
 // Enemy panels are pixel art drawn at a whole number of window pixels per DS pixel, like the game's
 // own party panel. They stack down the right of the top screen below the game's header bar, inside
 // the side bar when the window is wide enough to hold them at a readable scale.
+// Panel width, and the height of a panel with only the name, HP and MP.
 pub const ENEMY_PANEL_DS_PX: (u32, u32) = (64, 34);
 const ENEMY_PANEL_GAP_DS_PX: u32 = 2;
 
-pub fn enemy_panel_rects(window_px: (u32, u32), count: usize, margin_px: u32) -> Vec<RectPx> {
-    let image = fit_centered(window_px.0, window_px.1, NDS_ASPECT);
-    let image_scale = image.height as f32 / NDS_SCREEN_HEIGHT_PX as f32;
-    let image_right = image.x + image.width as i32;
+// One rect per panel, stacked under the game's header; `heights_ds_px` are the panels' heights in
+// DS pixels. The scale shrinks when a tall stack would run off the window.
+pub fn enemy_panel_rects(
+    window_px: (u32, u32),
+    plan: &ScreenPlan,
+    heights_ds_px: &[u32],
+    margin_px: u32,
+) -> Vec<RectPx> {
+    let image = top_image(window_px, plan);
+    // The game draws everything in the 4:3 middle; with widescreen 3D the extra strips on each side
+    // are free, so the panels go there and never cover the game's own boxes.
+    let content = if top_is_wide(plan) {
+        RectPx {
+            x: image.x + (image.width / 8) as i32,
+            width: image.width * 3 / 4,
+            ..image
+        }
+    } else {
+        image
+    };
+    let image_scale = content.height as f32 / NDS_SCREEN_HEIGHT_PX as f32;
+    let image_right = content.x + content.width as i32;
     let side_bar_px = (window_px.0 as i32 - image_right - 2 * margin_px as i32).max(0) as u32;
     let side_scale = side_bar_px / ENEMY_PANEL_DS_PX.0;
     let readable_scale = ((image_scale * 0.5).round() as u32).max(1);
     let full_scale = (image_scale.floor() as u32).max(1);
-    let (scale, x) = if side_scale >= readable_scale {
-        let scale = side_scale.min(full_scale);
-        (scale, image_right + margin_px as i32)
-    } else {
-        let width = (ENEMY_PANEL_DS_PX.0 * full_scale) as i32;
-        (full_scale, image_right - margin_px as i32 - width)
-    };
-    let (width, height) = (ENEMY_PANEL_DS_PX.0 * scale, ENEMY_PANEL_DS_PX.1 * scale);
     let top = image.y + (GAME_HEADER_DS_PX * image_scale).round() as i32;
-    let step = (height + ENEMY_PANEL_GAP_DS_PX * scale) as i32;
-    (0..count as i32)
-        .map(|index| RectPx {
-            x,
-            y: top + index * step,
-            width,
-            height,
+    let stack_ds_px: u32 = heights_ds_px
+        .iter()
+        .map(|height| height + ENEMY_PANEL_GAP_DS_PX)
+        .sum();
+    let free_height_px = (window_px.1 as i32 - top - margin_px as i32).max(0) as u32;
+    let fit_scale = (free_height_px / stack_ds_px.max(1)).max(1);
+    let in_side_bar = side_scale >= readable_scale;
+    let scale = if in_side_bar {
+        side_scale.min(full_scale)
+    } else {
+        full_scale
+    }
+    .min(fit_scale);
+    let width = ENEMY_PANEL_DS_PX.0 * scale;
+    let x = if in_side_bar {
+        image_right + margin_px as i32
+    } else {
+        image_right - margin_px as i32 - width as i32
+    };
+    let mut y = top;
+    heights_ds_px
+        .iter()
+        .map(|height_ds_px| {
+            let rect = RectPx {
+                x,
+                y,
+                width,
+                height: height_ds_px * scale,
+            };
+            y += ((height_ds_px + ENEMY_PANEL_GAP_DS_PX) * scale) as i32;
+            rect
         })
         .collect()
 }
 
 pub fn touch_target(window_px: (u32, u32), plan: &ScreenPlan, margin_px: u32) -> Option<RectPx> {
-    let in_arrangement = arrangement_rects(window_px, plan.arrangement)
+    let in_arrangement = arrangement_rects(window_px, plan)
         .into_iter()
         .find(|(screen, _)| *screen == Screen::Bottom)
         .map(|(_, rect)| rect);
@@ -245,13 +311,69 @@ pub fn touch_target(window_px: (u32, u32), plan: &ScreenPlan, margin_px: u32) ->
         plan.overlays
             .iter()
             .find(|overlay| overlay.accepts_touch)
-            .map(|overlay| overlay_rect(window_px, overlay, margin_px))
+            .map(|overlay| overlay_rect(window_px, plan, overlay, margin_px))
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn top_only(wide_frame: bool) -> ScreenPlan {
+        ScreenPlan {
+            arrangement: Arrangement::Single(Screen::Top),
+            overlays: Vec::new(),
+            wide_frame,
+        }
+    }
+
+    fn side_by_side() -> ScreenPlan {
+        ScreenPlan {
+            arrangement: Arrangement::SideBySide,
+            overlays: Vec::new(),
+            wide_frame: true,
+        }
+    }
+
+    #[test]
+    fn widescreen_frames_are_detected_from_their_size() {
+        assert!(!is_wide_frame(1024, 1536));
+        assert!(is_wide_frame(1365, 1536));
+    }
+
+    #[test]
+    fn a_lone_wide_top_screen_fills_a_16_9_window_and_shows_its_whole_width() {
+        let plan = top_only(true);
+        assert_eq!(
+            arrangement_rects((1920, 1080), &plan),
+            [(
+                Screen::Top,
+                RectPx {
+                    x: 0,
+                    y: 0,
+                    width: 1920,
+                    height: 1080
+                }
+            )]
+        );
+        assert_eq!(source_span(Screen::Top, &plan), (0.0, 1.0));
+        assert_eq!(source_span(Screen::Bottom, &plan), (0.125, 0.875));
+    }
+
+    #[test]
+    fn next_to_each_other_both_screens_show_their_4_3_middle() {
+        let plan = side_by_side();
+        assert_eq!(source_span(Screen::Top, &plan), (0.125, 0.875));
+        assert_eq!(arrangement_rects((2560, 1080), &plan)[0].1.width, 1280);
+    }
+
+    #[test]
+    fn enemy_panels_sit_in_the_widescreen_strip_clear_of_the_games_4_3_middle() {
+        let rects = enemy_panel_rects((1920, 1080), &top_only(true), &[34], 16);
+        let middle_right_px = 240 + 1440;
+        assert_eq!(rects[0].x, middle_right_px + 16);
+        assert!(rects[0].x + rects[0].width as i32 <= 1920);
+    }
 
     fn no_pip() -> PipSettings {
         PipSettings {
@@ -262,7 +384,13 @@ mod tests {
 
     #[test]
     fn menus_show_both_screens_because_details_live_on_top() {
-        let plan = plan(GameMode::Menu, false, &HudSettings::default(), &no_pip());
+        let plan = plan(
+            GameMode::Menu,
+            false,
+            &HudSettings::default(),
+            &no_pip(),
+            false,
+        );
         assert_eq!(plan.arrangement, Arrangement::SideBySide);
         assert_eq!(plan.overlays, []);
     }
@@ -274,7 +402,8 @@ mod tests {
                 GameMode::Unknown(0x0100),
                 false,
                 &HudSettings::default(),
-                &no_pip()
+                &no_pip(),
+                false,
             )
             .arrangement,
             Arrangement::SideBySide
@@ -288,19 +417,21 @@ mod tests {
             true,
             &HudSettings::default(),
             &no_pip(),
+            false,
         );
         assert_eq!(
             plan,
             ScreenPlan {
                 arrangement: Arrangement::Single(Screen::Bottom),
-                overlays: Vec::new()
+                overlays: Vec::new(),
+                wide_frame: false
             }
         );
     }
 
     #[test]
     fn side_by_side_letterboxes_two_4_3_screens_in_a_21_9_window() {
-        let rects = arrangement_rects((2560, 1080), Arrangement::SideBySide);
+        let rects = arrangement_rects((2560, 1080), &side_by_side());
         assert_eq!(
             rects,
             [
@@ -329,7 +460,7 @@ mod tests {
     #[test]
     fn exploring_a_dungeon_shows_the_top_screen_with_a_minimap() {
         let mode = GameMode::Dungeon { dialogue: false };
-        let plan = plan(mode, false, &HudSettings::default(), &no_pip());
+        let plan = plan(mode, false, &HudSettings::default(), &no_pip(), false);
         assert_eq!(plan.arrangement, Arrangement::Single(Screen::Top));
         assert_eq!(plan.overlays.len(), 1);
         assert_eq!(plan.overlays[0].crop, AUTOMAP_CROP);
@@ -342,7 +473,7 @@ mod tests {
             ..HudSettings::default()
         };
         let mode = GameMode::Dungeon { dialogue: false };
-        assert_eq!(plan(mode, false, &hud, &no_pip()).overlays, []);
+        assert_eq!(plan(mode, false, &hud, &no_pip(), false).overlays, []);
     }
 
     #[test]
@@ -352,7 +483,7 @@ mod tests {
             GameMode::ShipScene,
             GameMode::Dungeon { dialogue: true },
         ] {
-            let plan = plan(mode, false, &HudSettings::default(), &no_pip());
+            let plan = plan(mode, false, &HudSettings::default(), &no_pip(), false);
             assert_eq!(plan.arrangement, Arrangement::Single(Screen::Top));
             assert_eq!(plan.overlays, []);
         }
@@ -361,7 +492,7 @@ mod tests {
     #[test]
     fn minimap_sits_in_the_image_corner_below_the_game_header() {
         let overlay = minimap_overlay(&HudSettings::default());
-        let rect = overlay_rect((1920, 1080), &overlay, 16);
+        let rect = overlay_rect((1920, 1080), &top_only(false), &overlay, 16);
         let image_right_px = 240 + 1440;
         let header_px = 135;
         assert_eq!(
@@ -377,7 +508,7 @@ mod tests {
 
     #[test]
     fn enemy_panels_sit_in_the_side_bar_of_a_16_9_window() {
-        let rects = enemy_panel_rects((1920, 1080), 2, 16);
+        let rects = enemy_panel_rects((1920, 1080), &top_only(false), &[34, 34], 16);
         assert_eq!(
             rects,
             [
@@ -398,8 +529,16 @@ mod tests {
     }
 
     #[test]
+    fn a_tall_stack_shrinks_to_stay_inside_the_window() {
+        let rects = enemy_panel_rects((1920, 1080), &top_only(true), &[100; 4], 16);
+        let last = rects.last().unwrap();
+        assert!(last.y + last.height as i32 <= 1080 - 16);
+        assert_eq!(rects[0].width, 64 * 2);
+    }
+
+    #[test]
     fn enemy_panels_overlay_the_image_of_a_4_3_window_at_full_scale() {
-        let rects = enemy_panel_rects((1440, 1080), 1, 16);
+        let rects = enemy_panel_rects((1440, 1080), &top_only(false), &[34], 16);
         assert_eq!(
             rects[0],
             RectPx {
@@ -412,35 +551,22 @@ mod tests {
     }
 
     #[test]
-    fn summon_list_comes_up_over_the_fight_and_takes_touch() {
-        let mode = GameMode::Battle { bottom_menu: true };
-        let plan = plan(mode, false, &HudSettings::default(), &no_pip());
-        assert_eq!(plan.arrangement, Arrangement::Single(Screen::Top));
-        assert_eq!(plan.overlays, [BOTTOM_MENU_OVERLAY]);
-        assert!(touch_target((1920, 1080), &plan, 16).is_some());
-        let pip = PipSettings {
-            visible: true,
-            ..PipSettings::default()
-        };
-        let with_pip = super::plan(mode, false, &HudSettings::default(), &pip);
-        assert_eq!(
-            with_pip.overlays,
-            [BOTTOM_MENU_OVERLAY],
-            "no second copy of the bottom screen"
-        );
-    }
-
-    #[test]
     fn battles_show_the_top_screen() {
-        let mode = GameMode::Battle { bottom_menu: false };
-        let plan = plan(mode, false, &HudSettings::default(), &no_pip());
+        let mode = GameMode::Battle;
+        let plan = plan(mode, false, &HudSettings::default(), &no_pip(), false);
         assert_eq!(plan.overlays, []);
         assert_eq!(plan.arrangement, Arrangement::Single(Screen::Top));
     }
 
     #[test]
     fn touch_goes_to_the_visible_bottom_screen_or_the_pip() {
-        let menu = plan(GameMode::Menu, false, &HudSettings::default(), &no_pip());
+        let menu = plan(
+            GameMode::Menu,
+            false,
+            &HudSettings::default(),
+            &no_pip(),
+            false,
+        );
         assert_eq!(
             touch_target((2560, 1080), &menu, 16),
             Some(RectPx {
@@ -455,6 +581,7 @@ mod tests {
             false,
             &HudSettings::default(),
             &no_pip(),
+            false,
         );
         assert_eq!(touch_target((1920, 1080), &field, 16), None);
         let pip = PipSettings {
@@ -466,6 +593,7 @@ mod tests {
             false,
             &HudSettings::default(),
             &pip,
+            false,
         );
         assert!(touch_target((1920, 1080), &with_pip, 16).is_some());
     }

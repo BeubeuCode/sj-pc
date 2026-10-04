@@ -65,6 +65,19 @@ rebinding. `Platform::new` sets `SDL_JOYSTICK_HIDAPI_XBOX=0` on macOS, so SDL us
 instead. Apple tracks the firmware and no Input Monitoring permission is needed. Linux and Windows are
 unchanged. Revisit when we move to a newer SDL.
 
+## 017 Widescreen is done in the emulator, not by patching the game
+Eight call sites build the game's perspective projections, once per scene, and the whole top-screen
+interface (status bar, party panel, menus, text boxes, enemy sprites) is 3D too. Patching the game's
+aspect would have meant one patch per scene and a stretched interface. Instead our melonDS patch squeezes
+every rendered vertex's clip-space x by 3/4 and draws the 3D into a 4/3 wider target. Perspective scenes
+gain field of view at their original scale, and 3D interface pieces land centred at their original size.
+Box, position and vector tests keep the real matrices, so game logic is unaffected. The 2D layers stay
+4:3 in the middle of the wider composite. The game does not cull the wider view in dungeons or battles.
+Only the regular OpenGL renderer and the Top/Bottom layout support it; the software renderer stays 4:3.
+Scenes that are pre-rendered 2D images (ship rooms) stay 4:3 with black sides.
+The status bar's moon-phase and SEARCH/ANALYZE blocks are pegged to the screen edges by the same patch,
+by position, since this fork only ever runs Strange Journey.
+
 ## 014 Menus show both screens side by side, not the bottom screen alone
 The plan said menus would put the bottom screen in front. Lab captures showed the Y menu, the mission
 log and name entry split their content: list on the bottom, details on the top. Showing only one

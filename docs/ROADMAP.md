@@ -11,7 +11,7 @@ Status legend: `done`, `in progress`, `todo`.
 | One-screen UI (A) research tooling | done | `sj-lab` headless runner, F9 snapshots, F12 RAM search |
 | One-screen UI (B) foundation | done | game-mode detection (battle included), screen director, minimap overlay, new bindings |
 | One-screen UI (C) crop HUD | skipped for battle | battle went straight to native cards; minimap waits on a dungeon sample |
-| One-screen UI (D) widescreen | todo | 16:9 dungeon camera |
+| One-screen UI (D) widescreen | done | melonDS patch: 3D drawn 4/3 wider, 2D centred; dungeons and battles in 16:9 |
 | One-screen UI (E) native HUD | in progress | enemy panels with names and HP/MP done; party bars, heading-up minimap |
 | One-screen UI (F) text entry | todo | name buffers found, encoding and pointer chain to map |
 | M4 Native UI via decomp | todo | ARM9 hooks, native map/menus/dialog drawn at full resolution |
@@ -43,6 +43,7 @@ Deliberately not built yet: the RAM watch. It needs real addresses from M3 first
 HD textures, netplay, Redux (3DS) content, public release packaging, native plugin ABI.
 
 ## One-screen UI: what blocks what
-- The summon-list flag (battle scene `+0x68`) rests on one snapshot. Item and skill lists probably
-  need the same treatment: snapshots of each confirm it.
+- Native pages show name, level, HP, MP, race, affinities (only the non-normal ones, as text) and
+  skills. The game's element icons would need its graphics loaded from the ROM at runtime. The hero's
+  affinities come from gear and are not mapped yet.
 - Heading-up minimap needs player position and facing (collision code at `0x0202FDD4` is the lead).
