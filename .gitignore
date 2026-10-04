@@ -1,0 +1,14 @@
+roms/
+*.nds
+*.sav
+*.dsv
+target/
+re/ghidra/
+mods/*
+!mods/README.md
+.DS_Store
+extern/build/
+cores/
+saves/
+sj.toml
+*.ppm

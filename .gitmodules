@@ -1,0 +1,3 @@
+[submodule "extern/melonDS-ds"]
+	path = extern/melonDS-ds
+	url = https://github.com/JesseTG/melonds-ds.git
