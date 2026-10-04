@@ -43,14 +43,21 @@ Found with `sj-lab` snapshots (see `re/scripts/`) and public Action Replay codes
 | `0x0221463C` | u8 | Moon phase (`0x00` full, `0x28` half, `0x50` new) | AR codes | high |
 | `0x0221468F` | u8 ×0x39 | Expendable item counts | AR codes | high |
 | `0x022159F2 + n×0x24` | u16 | Compendium entry field, 491 entries | AR codes | medium |
-| `0x0216AB60` | u16 | Scene flags, one bit per top-level scene, see `game_mode.rs` | diff of all lab samples | high |
+| `0x0216B440` | ptr | Current top-level scene object; child scene at `+0x1C`. Battle scene = current (ship) or its child (dungeon) | 4 battle snapshots, no false hit in ~120 others | high |
+| scene `+0x94` | ptr ×10 | Battle unit table: hero, allies 1-3, enemies 1-6 (empty slots point at zeroed units). Hero unit follows the table, so `table[0] == table + 0x28` identifies a battle scene | 4 battle snapshots | high |
+| battle scene `+0x68` | u32 | Non-zero while a bottom-screen list is open (seen: Summon) | 1 summon snapshot vs 4 battles | low |
 | `0x0216B44C` | u32 | Area flags; bit `0x10` set in dungeons (battles there too), else `0x01` | 5 dungeon snapshots | medium |
 | `0x0216B9AC` | ptr | Message window object, non-null while a dialogue box is open | ship + dungeon dialogue, 35 snapshots, one mislabel | high |
+| unit | struct | Battle unit, stride `0x2E0`: HP `+0x2C`, max HP `+0x30`, MP `+0x38`, max MP `+0x3C` (u32), name ptr `+0x28` into the loaded demon name table | 4 battle snapshots, AR codes | high |
+| `0x02229514` | — | Unit table address in public AR codes. Right for dungeon battles, wrong for the ship's first battle (`0x0222BE34`) | AR codes | partial |
+| `0x0216AB60` | u16 | Scene flags, one bit per top-level scene, see `game_mode.rs` | diff of all lab samples | high |
 | `0x02222700` | u16 ×8 | First-name edit buffer during Name Entry (heap) | diff during Name Entry | high |
 | `0x02222680` | u16 ×8 | Last-name edit buffer during Name Entry (heap) | same | high |
 | — | — | dungeon camera projection call site | Phase D target, see `WIDESCREEN.md` | — |
 
-Character encoding: 16-bit codes, digit "1" is `0x0012`. Full table still to map.
+Character encoding: ASCII minus `0x1F` (digit "1" is `0x12`, "B" `0x23`, space `0x01`). Save data and
+edit buffers use 16-bit codes; loaded string tables (demon names, `Data/Enemy/NKMBaseData.mbb`) use
+one byte per character between `0xFF 0xFF` and a `0x00`/`0xFE` end. Decoder: `sj_game::text`.
 
 ## Screen usage observed (DS version)
 | Situation | Top screen | Bottom screen |

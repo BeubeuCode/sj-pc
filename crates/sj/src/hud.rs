@@ -3,6 +3,7 @@ use sj_game::rect::RectPx;
 use sj_game::screen_director::{overlay_rect, Screen, ScreenPlan};
 use sj_game::{NDS_SCREEN_HEIGHT_PX, NDS_SCREEN_WIDTH_PX};
 
+use crate::pixel_canvas::{PixelCanvas, FRAME_DS_PX};
 use crate::present::{FrameInfo, RowOrder};
 
 pub fn draw_overlays(
@@ -19,6 +20,7 @@ pub fn draw_overlays(
     let points_per_pixel = 1.0 / root.ctx().pixels_per_point();
     for overlay in &plan.overlays {
         let rect_px = overlay_rect(drawable_px, overlay, margin_px);
+        draw_frame_around(root, rect_px, overlay.crop, points_per_pixel);
         let alpha = (overlay.opacity.clamp(0.0, 1.0) * 255.0).round() as u8;
         root.painter().image(
             texture,
@@ -27,6 +29,19 @@ pub fn draw_overlays(
             Color32::from_white_alpha(alpha),
         );
     }
+}
+
+// The frame sits just outside the crop, at the crop's own DS pixel scale.
+fn draw_frame_around(root: &egui::Ui, rect_px: RectPx, crop: RectPx, points_per_pixel: f32) {
+    let pixel = rect_px.height as f32 / crop.height as f32 * points_per_pixel;
+    let image_min = pos2(rect_px.x as f32, rect_px.y as f32) * points_per_pixel;
+    let canvas = PixelCanvas {
+        painter: root.painter(),
+        origin: image_min - egui::vec2(1.0, 1.0) * FRAME_DS_PX as f32 * pixel,
+        pixel,
+        opacity: 1.0,
+    };
+    canvas.frame(crop.width + 2 * FRAME_DS_PX, crop.height + 2 * FRAME_DS_PX);
 }
 
 fn to_points(rect: RectPx, points_per_pixel: f32) -> Rect {

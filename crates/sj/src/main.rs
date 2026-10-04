@@ -1,4 +1,5 @@
 mod app;
+mod battle_hud;
 mod capture;
 mod dev_panel;
 mod host_input;
@@ -6,6 +7,8 @@ mod hud;
 mod launcher;
 mod mouse_points;
 mod overlay;
+mod pixel_canvas;
+mod pixel_font;
 mod platform;
 mod present;
 mod savestate;

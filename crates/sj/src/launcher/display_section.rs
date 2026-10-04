@@ -72,6 +72,10 @@ fn show_video(ui: &mut egui::Ui, video: &mut VideoSettings) {
 fn show_hud(ui: &mut egui::Ui, hud: &mut HudSettings) {
     ui.label("HUD");
     egui::Grid::new("hud").num_columns(2).show(ui, |ui| {
+        ui.label("Enemy panel");
+        ui.checkbox(&mut hud.enemy_panel, "Show enemy HP and MP in battle");
+        ui.end_row();
+
         ui.label("Minimap");
         ui.checkbox(&mut hud.minimap, "Show the automap while exploring");
         ui.end_row();

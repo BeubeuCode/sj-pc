@@ -7,15 +7,19 @@ use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
 use sj_emu::{AvInfo, Core, CoreConfig, Frame, Pointer};
 use sj_game::audio::apply_volume;
+use sj_game::battle::{read_enemies, EnemyStatus};
 use sj_game::core_options::{core_variables, Renderer};
 use sj_game::game_api::GameApi;
 use sj_game::game_mode::{self, GameMode};
 use sj_game::input::button_mask;
-use sj_game::screen_director::{self, arrangement_rects, touch_target, ScreenPlan};
+use sj_game::screen_director::{
+    self, arrangement_rects, enemy_panel_rects, touch_target, ScreenPlan,
+};
 use sj_game::settings::{HotkeyAction, Settings};
 use sj_game::snapshot::{self, Snapshot};
 use sj_game::touch::{bottom_screen_to_pointer, mouse_to_bottom_screen};
 
+use crate::battle_hud::draw_enemy_panels;
 use crate::capture::{encode_ppm, request_from_env, CaptureRequest};
 use crate::dev_panel::DevPanel;
 use crate::host_input::{key_input_name, pad_button_input_name, AxisThresholds, HostInput};
@@ -188,11 +192,14 @@ impl App {
         );
         let frame = self.presenter.frame_info();
         let (texture, margin_px) = (self.hud_texture, self.settings.hud.margin_px);
+        let enemies = self.visible_enemies(mode);
+        let enemy_rects = enemy_panel_rects(drawable_px, enemies.len(), margin_px);
         let status = format!("mode: {mode:?}  swapped: {}", self.swapped);
         let ram = self.core.main_ram();
         let dev_panel = &mut self.dev_panel;
         self.overlay.draw(|root| {
             draw_overlays(root, &plan, frame, texture, drawable_px, margin_px);
+            draw_enemy_panels(root, &enemies, &enemy_rects);
             dev_panel.show(root, ram, &status);
         });
         self.capture_if_requested();
@@ -225,6 +232,16 @@ impl App {
         while self.audio.size() > self.audio_target_bytes {
             std::thread::sleep(Duration::from_millis(1));
         }
+    }
+
+    fn visible_enemies(&self, mode: GameMode) -> Vec<EnemyStatus> {
+        if mode != (GameMode::Battle { bottom_menu: false })
+            || self.swapped
+            || !self.settings.hud.enemy_panel
+        {
+            return Vec::new();
+        }
+        read_enemies(&self.core)
     }
 
     fn plan(&self, mode: GameMode) -> ScreenPlan {

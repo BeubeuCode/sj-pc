@@ -40,6 +40,7 @@ Click or drag inside the overlay with the left mouse button to touch the screen.
 ## `[hud]`
 | Key | Default | Meaning |
 |---|---|---|
+| `enemy_panel` | `true` | Show enemy HP and MP cards in battle |
 | `minimap` | `true` | Show the automap as a minimap while exploring a dungeon |
 | `minimap_corner` | `top-right` | Corner of the minimap |
 | `minimap_height_fraction` | `0.3` | Minimap height as a share of the game image |

@@ -40,11 +40,18 @@ capture and the game, so a binding captured in the launcher always matches in ga
 Each frame the app reads the game mode (`sj_game::game_mode`, from the scene flags at `0x0216AB60`)
 and asks `sj_game::screen_director::plan` what to show:
 - **Dungeon** (scene flags `0x0000` like the title, plus the dungeon bit at `0x0216B44C`): top screen
-  fills the view, with the automap cropped from the bottom screen as a minimap below the game's
-  header bar. It hides while a dialogue box is open (`0x0216B9AC` non-null).
+  fills the view, with the automap cropped from the bottom screen as a minimap in the game's panel
+  frame, below the game's header bar. It hides while a dialogue box is open (`0x0216B9AC` non-null).
 - **Ship scenes (`0x0400`)** and **ship rooms (facility):** top screen only. Rooms are picked from a menu, so the room map is no use
   and would cover character portraits.
 - **Menus, mission log, title, name entry, unknown modes:** both screens side by side, because the game splits these screens between detail (top) and list (bottom).
+- **Battle (`0x0200`):** top screen only, plus native enemy panels (`sj_game::battle` reads the
+  unit table, `battle_hud.rs` draws them as pixel art in the game's party-panel style with
+  `pixel_canvas.rs` and our own proportional `pixel_font.rs` glyphs). Names come from the game's loaded
+  name table; repeated demons get letters ("Slime A", "Slime B"). They sit in the right side bar when the
+  window is wider than 4:3, otherwise over the right of the image.
+- **Battle with a bottom-screen list open** (Summon): the game's bottom screen comes up framed over
+  the right of the fight and takes clicks; the enemy panels step aside.
 - **Cinematics:** top screen only.
 - **Swap** (M, right-stick click) shows the bottom screen alone until pressed again.
 

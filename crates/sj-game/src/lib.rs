@@ -1,6 +1,7 @@
 pub mod addr;
 pub mod addresses;
 pub mod audio;
+pub mod battle;
 pub mod core_options;
 pub mod game_api;
 pub mod game_mode;
@@ -16,6 +17,7 @@ pub mod rom;
 pub mod screen_director;
 pub mod settings;
 pub mod snapshot;
+pub mod text;
 pub mod touch;
 
 pub const NDS_SCREEN_WIDTH_PX: u32 = 256;

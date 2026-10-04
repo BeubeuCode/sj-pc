@@ -17,7 +17,7 @@ impl GameApi for Snapshot {
     }
 }
 
-const EXPECTED_BY_LABEL_PREFIX: [(&str, GameMode); 15] = [
+const EXPECTED_BY_LABEL_PREFIX: [(&str, GameMode); 17] = [
     ("title", GameMode::Title),
     ("intro", GameMode::Event),
     ("walk-1-", GameMode::Event),
@@ -29,6 +29,8 @@ const EXPECTED_BY_LABEL_PREFIX: [(&str, GameMode); 15] = [
     ("ymenu-sub", GameMode::Menu),
     ("ymenu-closed", GameMode::Facility),
     ("xmenu", GameMode::MissionLog),
+    ("battle-summon", GameMode::Battle { bottom_menu: true }),
+    ("battle", GameMode::Battle { bottom_menu: false }),
     ("dungeon-talk", GameMode::Dungeon { dialogue: true }),
     ("dungeon-1", GameMode::Dungeon { dialogue: false }),
     ("md-deck", GameMode::Facility),

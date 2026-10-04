@@ -17,11 +17,12 @@ description: Nintendo DS reverse-engineering and libretro-host knowledge for the
 
 ## Known addresses
 `crates/sj-game/src/addresses.rs` is the code's source of truth; `docs/re/MEMORY_MAP.md` explains each.
-Highlights: scene flags `0x0216AB60` (game mode), player HP/MP `0x022142F8`, dungeon bit `0x10` at
-`0x0216B44C`, dialogue window `0x0216B9AC`. Scene flags alone confuse the title with dungeons (both
-`0x0000`). Public cheat codes for BMTE
-are already mined (`docs/re/README.md`); check them before hunting, and confirm any cheat address in a
-snapshot before trusting it.
+Highlights: scene flags `0x0216AB60` (game mode), player HP/MP `0x022142F8`, current scene `0x0216B440`
+(child `+0x1C`; battle unit table at `+0x94`), dungeon bit `0x10` at `0x0216B44C`, dialogue window
+`0x0216B9AC`. Scene flags alone confuse the title with dungeons (both `0x0000`).
+Text is ASCII minus `0x1F` (`sj_game::text`); battle unit `+0x28` points at the demon's name string. Cheat codes hardcode heap addresses: the AR battle table `0x02229514`
+was wrong in our runs, so confirm any cheat address in a snapshot before trusting it. Public cheat codes for BMTE are already mined
+(`docs/re/README.md`); check them before hunting.
 
 ## Recipes
 - **Find a variable:** follow the memory-diff recipe in `docs/re/README.md`, then confirm with a Ghidra xref.
