@@ -1,0 +1,16 @@
+[package]
+name = "sj"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+egui = "0.36"
+egui-sdl2 = { version = "0.12", default-features = false, features = ["glow-backend"] }
+glow = "0.17"
+sdl2 = { version = "0.38.0", features = ["bundled", "static-link"] }
+sj-emu = { path = "../sj-emu" }
+sj-game = { path = "../sj-game" }
+
+[lints]
+workspace = true
