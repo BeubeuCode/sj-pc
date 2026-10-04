@@ -1,0 +1,59 @@
+load re/scripts/checkpoints/deck.state
+press b
+wait 40
+press up 1
+press a
+wait 60
+press a
+mash a 900 every 30
+press b 4
+wait 60
+press up 1
+press a
+wait 60
+press right 1
+press a
+mash a 900 every 30
+press b 4
+wait 60
+snapshot all-deck-talked
+press a
+wait 40
+press a
+wait 300
+press b
+wait 40
+press up 1
+press a
+wait 60
+press a
+mash a 900 every 30
+press b 4
+wait 60
+press up 1
+press a
+wait 60
+press right 1
+press a
+mash a 900 every 30
+press b 4
+wait 60
+snapshot all-cr-talked
+press a
+wait 40
+press down 3
+press a
+wait 300
+snapshot all-deck-again
+press up 2
+press a
+wait 60
+snapshot all-disembark-1
+mash a 1800 every 30
+snapshot all-disembark-2
+mash a 1800 every 30
+snapshot all-disembark-3
+mash a 1800 every 30
+snapshot all-disembark-4
+mash a 1800 every 30
+snapshot all-disembark-5

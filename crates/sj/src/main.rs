@@ -1,8 +1,10 @@
 mod app;
 mod capture;
-mod core_options;
+mod dev_panel;
 mod host_input;
 mod launcher;
+mod mouse_points;
+mod overlay;
 mod platform;
 mod present;
 mod savestate;
@@ -15,6 +17,7 @@ use sj_game::settings::{load_or_default, Settings};
 
 const SETTINGS_PATH: &str = "sj.toml";
 const SKIP_LAUNCHER_FLAG: &str = "--play";
+const START_STATE_FLAG: &str = "--state";
 
 fn main() -> ExitCode {
     match run() {
@@ -51,6 +54,16 @@ fn run() -> Result<(), String> {
             None => return Ok(()),
         }
     };
-    app::App::new(platform, settings)?.run();
+    let mut app = app::App::new(platform, settings)?;
+    if let Some(state_path) = flag_value(START_STATE_FLAG) {
+        app.load_state_file(Path::new(&state_path))?;
+    }
+    app.run();
     Ok(())
+}
+
+fn flag_value(flag: &str) -> Option<String> {
+    let arguments: Vec<String> = std::env::args().collect();
+    let position = arguments.iter().position(|argument| argument == flag)?;
+    arguments.get(position + 1).cloned()
 }

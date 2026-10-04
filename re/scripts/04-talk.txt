@@ -1,0 +1,17 @@
+load re/scripts/checkpoints/command-room.state
+press b
+wait 30
+press down 4
+wait 20
+snapshot cr-talk-cursor
+press a
+wait 90
+snapshot cr-talk-1
+mash a 1200 every 30
+snapshot cr-talk-2
+mash a 1800 every 30
+snapshot cr-talk-3
+mash a 1800 every 30
+snapshot cr-talk-4
+mash a 1800 every 30
+snapshot cr-talk-5

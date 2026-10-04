@@ -22,13 +22,18 @@ Rust from Homebrew is keg-only: `export PATH="/opt/homebrew/opt/rustup/bin:$PATH
 ```
 ./scripts/build-core.sh      # once, builds cores/melondsds_libretro.*
 cargo build
-cargo run -p sj               # launcher first
-cargo run -p sj -- --play     # straight into the game
-cargo test
-cargo clippy --all-targets -- -D warnings
+cargo run                     # launcher first
+cargo run -- --play           # straight into the game
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --check
 ```
 All of `test`, `clippy` and `fmt --check` pass before a task is done.
+Research loop (see `docs/ARCHITECTURE.md`, "Research tooling"):
+```
+cargo build --release -p sj-lab && ./target/release/sj-lab re/scripts/<script>.txt
+cargo run -p sj -- --play --state re/samples/<label>-<n>/savestate.state
+```
 The ROM smoke test is `#[ignore]`d. Run it with `cargo test -p sj-emu --test rom_smoke -- --ignored`.
 To check rendering without a screen, capture a frame:
 `SJ_CAPTURE_AFTER_FRAMES=900 SJ_CAPTURE_PATH=/tmp/shot.ppm cargo run -p sj -- --play`

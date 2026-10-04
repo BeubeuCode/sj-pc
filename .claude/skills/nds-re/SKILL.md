@@ -20,9 +20,13 @@ description: Nintendo DS reverse-engineering and libretro-host knowledge for the
 - **Patch code or data:** add a `sj_game::patch::Patch` with the exact original bytes. `apply` refuses on
   mismatch, so a different ROM revision fails loudly. Test it against `FakeGame` in the same file.
 - **Record every find** in `docs/re/symbols.txt` (`address size name notes`) and `docs/re/MEMORY_MAP.md`.
-- **See the screen without a display:** `SJ_CAPTURE_AFTER_FRAMES=N SJ_CAPTURE_PATH=x.ppm cargo run -p sj -- --play`
+- **See the screen without a display:** `SJ_CAPTURE_AFTER_FRAMES=N SJ_CAPTURE_PATH=x.ppm cargo run -- --play`
   (without `--play` it captures the launcher).
   Convert the PPM to PNG with a few lines of stdlib Python (zlib + struct) to view it.
+- **Reach a game state headlessly:** write a `re/scripts/*.txt` script for `sj-lab` (`wait N`,
+  `press BUTTONS [times]`, `hold BUTTONS N`, `mash BUTTONS N every M`, `snapshot LABEL`, `save PATH`,
+  `load PATH`; buttons joined with `+`). Run several branches in parallel processes from one
+  checkpoint. B in facility menus jumps the cursor to "Move"; mashing A re-opens conversations.
 - **Boot test without a window:** `cargo test -p sj-emu --test rom_smoke -- --ignored` runs 600 frames in software mode.
 
 ## libretro host gotchas (learned the hard way)

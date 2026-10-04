@@ -12,3 +12,6 @@ cores/
 saves/
 sj.toml
 *.ppm
+re/samples/
+re/lab-saves/
+re/scripts/checkpoints/

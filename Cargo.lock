@@ -658,6 +658,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "sj-lab"
+version = "0.1.0"
+dependencies = [
+ "sj-emu",
+ "sj-game",
+]
+
+[[package]]
 name = "skrifa"
 version = "0.44.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

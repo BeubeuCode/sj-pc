@@ -1,7 +1,7 @@
 # Configuration
 
-The launcher that opens with `cargo run -p sj` edits everything on this page. Press **Play** to
-save and start, or **Save settings** to save without playing. Start with `cargo run -p sj -- --play`
+The launcher that opens with `cargo run` edits everything on this page. Press **Play** to
+save and start, or **Save settings** to save without playing. Start with `cargo run -- --play`
 to skip the launcher.
 
 Settings live in `sj.toml` in the working directory. Any key you leave out keeps its default, and
@@ -57,6 +57,9 @@ Click or drag inside the overlay with the left mouse button to touch the screen.
 | `save_state` | `F5` |
 | `load_state` | `F8` |
 | `previous_slot`, `next_slot` | `F6`, `F7` |
+| `snapshot` (research) | `F9` |
+
+`F12` opens the RAM search panel. It is a fixed developer key.
 
 The current slot (0 to 9) shows in the window title. Slots are `saves/slot<N>.state`.
 

@@ -36,6 +36,15 @@ The launcher is split by concern:
 Input names (`"X"`, `"pad:a"`, `"pad:leftx-"`) come from `host_input.rs` for both the launcher's
 capture and the game, so a binding captured in the launcher always matches in game.
 
+## Research tooling
+- `sj-lab` (dev binary) runs the core headless in software mode and plays scripts from `re/scripts/`:
+  `wait`, `press`, `hold`, `mash`, `snapshot`, `save`, `load`.
+- Snapshots (`re/samples/<label>-<n>/`, gitignored) hold the savestate, main RAM and both screens as PNG.
+  F9 in the app writes the same layout.
+- F12 in the app opens the RAM search panel (value, changed, unchanged, increased, decreased, watch list).
+- `cargo run -- --play --state <file>` starts from a savestate. The state is applied after the
+  first frame because the core resets the console during it.
+
 ## Frame loop (`crates/sj/src/app.rs`)
 1. **Events.** SDL events update `HostInput` (pressed key and pad names), the mouse position and hotkeys.
 2. **Emulate.** The joypad mask comes from `sj_game::input::button_mask` and the touch pointer from
@@ -91,6 +100,6 @@ RAM patches, the future RAM watch and future Lua mods all go through it. Nothing
 memory directly.
 
 ## Debug capture
-`SJ_CAPTURE_AFTER_FRAMES=900 SJ_CAPTURE_PATH=shot.ppm cargo run -p sj -- --play` runs 900 game frames,
+`SJ_CAPTURE_AFTER_FRAMES=900 SJ_CAPTURE_PATH=shot.ppm cargo run -- --play` runs 900 game frames,
 writes the window as a PPM image and quits. Without `--play` it captures the launcher instead.
 Use it to check rendering without a screen recorder.

@@ -1,0 +1,13 @@
+load re/scripts/checkpoints/command-room.state
+press b
+wait 40
+press a
+wait 30
+press down 1
+press a
+wait 120
+snapshot sickbay-a
+mash a 1800 every 30
+snapshot sickbay-b
+mash a 2400 every 30
+snapshot sickbay-c

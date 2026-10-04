@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
@@ -7,24 +7,32 @@ use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
 use sj_emu::{AvInfo, Core, CoreConfig, Frame, Pointer};
 use sj_game::audio::apply_volume;
+use sj_game::core_options::{core_variables, Renderer};
+use sj_game::game_api::GameApi;
 use sj_game::input::button_mask;
 use sj_game::layout::{screen_rects, NDS_ASPECT};
 use sj_game::settings::{HotkeyAction, Settings};
+use sj_game::snapshot::{self, Snapshot};
 use sj_game::touch::{bottom_screen_to_pointer, mouse_to_bottom_screen};
 
 use crate::capture::{encode_ppm, request_from_env, CaptureRequest};
-use crate::core_options::core_variables;
+use crate::dev_panel::DevPanel;
 use crate::host_input::{key_input_name, AxisThresholds, HostInput};
+use crate::overlay::Overlay;
 use crate::platform::Platform;
 use crate::present::{read_default_framebuffer, Presenter};
 use crate::savestate::{next_slot, previous_slot, slot_path};
 
 const FAST_FORWARD_FRAMES_PER_PRESENT: u32 = 4;
+const SAMPLES_DIR: &str = "re/samples";
+const DEV_PANEL_KEY: &str = "F12";
 const AUDIO_BUFFER_FRAMES: f64 = 4.0;
 
 pub struct App {
     settings: Settings,
     core: Core,
+    overlay: Overlay,
+    dev_panel: DevPanel,
     platform: Platform,
     presenter: Presenter,
     audio: AudioQueue<i16>,
@@ -33,6 +41,7 @@ pub struct App {
     mouse_drawable_px: Option<(i32, i32)>,
     capture: Option<CaptureRequest>,
     frames_presented: u64,
+    pending_state: Option<Vec<u8>>,
     slot: u8,
     fast_forward: bool,
     running: bool,
@@ -48,12 +57,15 @@ impl App {
             .load_game(&settings.rom)
             .map_err(|error| error.to_string())?;
         let presenter = create_presenter(&platform.gl, &core, av_info)?;
+        let overlay = Overlay::new(&platform);
         let audio = open_audio(&platform, av_info)?;
         let thresholds =
             AxisThresholds::from_deadzone_percent(settings.controller.stick_deadzone_percent);
         Ok(Self {
             settings,
             core,
+            overlay,
+            dev_panel: DevPanel::new(),
             platform,
             presenter,
             audio,
@@ -62,6 +74,7 @@ impl App {
             mouse_drawable_px: None,
             capture: request_from_env(),
             frames_presented: 0,
+            pending_state: None,
             slot: 0,
             fast_forward: false,
             running: true,
@@ -91,6 +104,7 @@ impl App {
                 self.pointer(),
             );
             let mut output = self.core.run_frame();
+            self.apply_pending_state();
             if let Some(av_info) = output.new_av_info {
                 self.presenter.ensure_capacity(
                     &self.platform.gl,
@@ -139,6 +153,10 @@ impl App {
             &self.settings.pip,
             self.settings.video.filter,
         );
+        let status = format!("slot: {}", self.slot);
+        let ram = self.core.main_ram();
+        let dev_panel = &mut self.dev_panel;
+        self.overlay.draw(|root| dev_panel.show(root, ram, &status));
         self.capture_if_requested();
         self.platform.window.gl_swap_window();
         self.frames_presented += 1;
@@ -204,6 +222,14 @@ impl App {
     }
 
     fn handle_event(&mut self, event: &Event) {
+        self.overlay.handle_event(&self.platform, event);
+        if self.overlay.wants_keyboard() && is_keyboard(event) {
+            return;
+        }
+        if self.overlay.wants_pointer() && is_mouse(event) {
+            self.mouse_drawable_px = None;
+            return;
+        }
         match *event {
             Event::Quit { .. } => self.running = false,
             Event::KeyDown {
@@ -258,6 +284,10 @@ impl App {
     }
 
     fn handle_hotkey(&mut self, key: Keycode) {
+        if key_input_name(key) == DEV_PANEL_KEY {
+            self.dev_panel.open = !self.dev_panel.open;
+            return;
+        }
         let Some(action) = self.settings.hotkeys.action_for(&key_input_name(key)) else {
             return;
         };
@@ -269,6 +299,7 @@ impl App {
             HotkeyAction::LoadState => self.load_state(),
             HotkeyAction::PreviousSlot => self.select_slot(previous_slot(self.slot)),
             HotkeyAction::NextSlot => self.select_slot(next_slot(self.slot)),
+            HotkeyAction::Snapshot => self.take_snapshot(),
         }
     }
 
@@ -307,6 +338,44 @@ impl App {
         self.update_title(&status_text("loaded", &result));
     }
 
+    fn take_snapshot(&mut self) {
+        let result = self.write_snapshot();
+        let status = match result {
+            Ok(directory) => format!("(snapshot {})", directory.display()),
+            Err(error) => format!("(snapshot failed: {error})"),
+        };
+        self.update_title(&status);
+    }
+
+    fn write_snapshot(&self) -> Result<PathBuf, String> {
+        let savestate = self.core.save_state().map_err(|error| error.to_string())?;
+        let frame = self.presenter.read_frame(&self.platform.gl);
+        let snapshot = Snapshot {
+            label: "play",
+            savestate: &savestate,
+            main_ram: self.core.main_ram(),
+            frame: frame.as_ref(),
+        };
+        snapshot::write(Path::new(SAMPLES_DIR), &snapshot).map_err(|error| error.to_string())
+    }
+
+    // The core finishes booting the console during its first frame, which would wipe a state
+    // loaded earlier, so the state waits until one frame has run.
+    pub fn load_state_file(&mut self, path: &Path) -> Result<(), String> {
+        let state = std::fs::read(path).map_err(|error| format!("{}: {error}", path.display()))?;
+        self.pending_state = Some(state);
+        Ok(())
+    }
+
+    fn apply_pending_state(&mut self) {
+        let Some(state) = self.pending_state.take() else {
+            return;
+        };
+        if let Err(error) = self.core.load_state(&state) {
+            self.update_title(&format!("(start state failed: {error})"));
+        }
+    }
+
     fn current_slot_path(&self) -> PathBuf {
         slot_path(&self.settings.save_dir, self.slot)
     }
@@ -325,6 +394,20 @@ impl App {
     }
 }
 
+fn is_keyboard(event: &Event) -> bool {
+    matches!(
+        event,
+        Event::KeyDown { .. } | Event::KeyUp { .. } | Event::TextInput { .. }
+    )
+}
+
+fn is_mouse(event: &Event) -> bool {
+    matches!(
+        event,
+        Event::MouseButtonDown { .. } | Event::MouseButtonUp { .. } | Event::MouseMotion { .. }
+    )
+}
+
 fn status_text(action: &str, result: &Result<(), String>) -> String {
     match result {
         Ok(()) => format!("({action})"),
@@ -337,7 +420,7 @@ fn load_core(platform: &Platform, settings: &Settings) -> Result<Core, String> {
         core_path: settings.core.clone(),
         system_dir: settings.save_dir.clone(),
         save_dir: settings.save_dir.clone(),
-        variables: core_variables(settings),
+        variables: core_variables(settings, Renderer::OpenGl),
     };
     let lookup_video = platform.video.clone();
     Core::load(

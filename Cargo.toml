@@ -1,6 +1,8 @@
 [workspace]
 resolver = "2"
-members = ["crates/sj-game", "crates/sj-emu", "crates/sj"]
+members = ["crates/sj-game", "crates/sj-emu", "crates/sj", "crates/sj-lab"]
+# sj-lab is a research tool; leaving it out of the defaults keeps plain `cargo run` on the game.
+default-members = ["crates/sj-game", "crates/sj-emu", "crates/sj"]
 
 [workspace.package]
 edition = "2021"

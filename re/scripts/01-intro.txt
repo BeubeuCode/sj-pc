@@ -1,0 +1,15 @@
+# Cold boot to the title menu, start a new game, mash through the intro.
+wait 1500
+snapshot title
+save re/scripts/checkpoints/title.state
+press a
+wait 300
+snapshot after-new-game
+mash a 1200 every 30
+snapshot intro-a
+mash a 1200 every 30
+snapshot intro-b
+mash a 1200 every 30
+snapshot intro-c
+mash a 1200 every 30
+snapshot intro-d

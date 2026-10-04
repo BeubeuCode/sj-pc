@@ -1,0 +1,17 @@
+load re/scripts/checkpoints/command-room.state
+press b
+wait 40
+press a
+wait 60
+snapshot move-list
+press a
+wait 120
+snapshot moved-1
+mash a 1200 every 30
+snapshot moved-2
+mash a 1800 every 30
+snapshot moved-3
+mash a 1800 every 30
+snapshot moved-4
+mash a 1800 every 30
+snapshot moved-5

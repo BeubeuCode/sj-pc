@@ -1,0 +1,32 @@
+load re/scripts/checkpoints/deck.state
+press b
+wait 40
+press a
+wait 40
+press a
+wait 240
+snapshot back-cr
+press b
+wait 40
+press up 1
+press a
+wait 60
+press right 1
+press a
+wait 60
+mash a 1800 every 30
+snapshot zel-1
+mash a 1800 every 30
+snapshot zel-2
+mash a 1800 every 30
+snapshot zel-3
+mash a 1800 every 30
+snapshot zel-4
+mash a 1800 every 30
+snapshot zel-5
+mash a 1800 every 30
+snapshot zel-6
+mash a 1800 every 30
+snapshot zel-7
+mash a 1800 every 30
+snapshot zel-8

@@ -1,0 +1,27 @@
+load re/scripts/checkpoints/back-cr.state
+press down 3
+press a
+wait 60
+press right 1
+press a
+mash a 900 every 30
+press b 4
+wait 60
+snapshot zd-after-talk
+press b
+wait 30
+press a
+wait 40
+press down 3
+press a
+wait 300
+snapshot zd-deck
+press a
+wait 60
+snapshot zd-disembark-1
+mash a 1800 every 30
+snapshot zd-disembark-2
+mash a 1800 every 30
+snapshot zd-disembark-3
+mash a 1800 every 30
+snapshot zd-disembark-4

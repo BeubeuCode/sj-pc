@@ -1,0 +1,27 @@
+load re/scripts/checkpoints/back-cr.state
+press down 3
+press a
+wait 60
+wait 1
+press a
+mash a 900 every 30
+press b 4
+wait 60
+snapshot md-after-talk
+press b
+wait 30
+press a
+wait 40
+press down 3
+press a
+wait 300
+snapshot md-deck
+press a
+wait 60
+snapshot md-disembark-1
+mash a 1800 every 30
+snapshot md-disembark-2
+mash a 1800 every 30
+snapshot md-disembark-3
+mash a 1800 every 30
+snapshot md-disembark-4

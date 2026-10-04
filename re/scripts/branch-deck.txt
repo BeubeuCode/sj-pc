@@ -1,0 +1,13 @@
+load re/scripts/checkpoints/command-room.state
+press b
+wait 40
+press a
+wait 30
+press down 3
+press a
+wait 120
+snapshot deck-a
+mash a 1800 every 30
+snapshot deck-b
+mash a 2400 every 30
+snapshot deck-c

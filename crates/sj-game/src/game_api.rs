@@ -5,6 +5,12 @@ pub trait GameApi {
     fn main_ram_mut(&mut self) -> &mut [u8];
 }
 
+pub fn read_u16(game: &dyn GameApi, addr: Arm9Addr) -> Option<u16> {
+    let offset = addr.main_ram_offset(2)?;
+    let bytes = game.main_ram().get(offset..offset + 2)?;
+    Some(u16::from_le_bytes(bytes.try_into().ok()?))
+}
+
 pub fn read_u32(game: &dyn GameApi, addr: Arm9Addr) -> Option<u32> {
     let offset = addr.main_ram_offset(4)?;
     let bytes = game.main_ram().get(offset..offset + 4)?;

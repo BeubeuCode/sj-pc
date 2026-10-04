@@ -1,0 +1,8 @@
+load re/scripts/checkpoints/back-cr.state
+press a
+wait 60
+snapshot ml-1
+mash a 1800 every 30
+snapshot ml-2
+mash a 1800 every 30
+snapshot ml-3

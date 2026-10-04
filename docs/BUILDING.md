@@ -9,7 +9,7 @@
 ```
 git submodule update --init
 ./scripts/build-core.sh        # once, takes a few minutes; output lands in cores/
-cargo run -p sj                # first run writes sj.toml with defaults
+cargo run                # first run writes sj.toml with defaults
 ```
 
 `sj.toml`, `roms/`, `cores/` and `saves/` are relative to the working directory, so run from the repo root.

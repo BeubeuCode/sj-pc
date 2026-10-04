@@ -1,0 +1,25 @@
+load re/samples/intro-d-1/savestate.state
+mash a 1800 every 30
+snapshot walk-1
+mash a 1800 every 30
+snapshot walk-2
+mash a 1800 every 30
+snapshot walk-3
+mash a 1800 every 30
+snapshot walk-4
+mash a 1800 every 30
+snapshot walk-5
+mash a 1800 every 30
+snapshot walk-6
+mash a 1800 every 30
+snapshot walk-7
+mash a 1800 every 30
+snapshot walk-8
+mash a 1800 every 30
+snapshot walk-9
+mash a 1800 every 30
+snapshot walk-10
+mash a 1800 every 30
+snapshot walk-11
+mash a 1800 every 30
+snapshot walk-12

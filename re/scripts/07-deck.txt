@@ -1,0 +1,25 @@
+load re/scripts/checkpoints/deck-event.state
+mash a 1800 every 30
+snapshot deck-1
+mash a 1800 every 30
+snapshot deck-2
+mash a 1800 every 30
+snapshot deck-3
+mash a 1800 every 30
+snapshot deck-4
+mash a 1800 every 30
+snapshot deck-5
+mash a 1800 every 30
+snapshot deck-6
+mash a 1800 every 30
+snapshot deck-7
+mash a 1800 every 30
+snapshot deck-8
+mash a 1800 every 30
+snapshot deck-9
+mash a 1800 every 30
+snapshot deck-10
+mash a 1800 every 30
+snapshot deck-11
+mash a 1800 every 30
+snapshot deck-12

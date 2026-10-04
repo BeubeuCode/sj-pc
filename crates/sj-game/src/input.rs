@@ -36,6 +36,12 @@ impl NdsButton {
         NdsButton::Right,
     ];
 
+    pub fn from_name(name: &str) -> Option<NdsButton> {
+        NdsButton::ALL
+            .into_iter()
+            .find(|button| button.label().eq_ignore_ascii_case(name))
+    }
+
     pub fn label(self) -> &'static str {
         match self {
             NdsButton::A => "A",
@@ -93,6 +99,13 @@ pub fn button_mask(bindings: &Bindings, is_pressed: impl Fn(&str) -> bool) -> u1
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn buttons_parse_from_their_names_case_insensitively() {
+        assert_eq!(NdsButton::from_name("start"), Some(NdsButton::Start));
+        assert_eq!(NdsButton::from_name("A"), Some(NdsButton::A));
+        assert_eq!(NdsButton::from_name("turbo"), None);
+    }
 
     #[test]
     fn every_button_has_a_default_binding() {

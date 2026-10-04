@@ -54,10 +54,11 @@ pub enum HotkeyAction {
     LoadState,
     PreviousSlot,
     NextSlot,
+    Snapshot,
 }
 
 impl HotkeyAction {
-    pub const ALL: [HotkeyAction; 7] = [
+    pub const ALL: [HotkeyAction; 8] = [
         HotkeyAction::FastForward,
         HotkeyAction::TogglePip,
         HotkeyAction::ToggleFullscreen,
@@ -65,6 +66,7 @@ impl HotkeyAction {
         HotkeyAction::LoadState,
         HotkeyAction::PreviousSlot,
         HotkeyAction::NextSlot,
+        HotkeyAction::Snapshot,
     ];
 
     pub fn label(self) -> &'static str {
@@ -76,6 +78,7 @@ impl HotkeyAction {
             HotkeyAction::LoadState => "Load state",
             HotkeyAction::PreviousSlot => "Previous slot",
             HotkeyAction::NextSlot => "Next slot",
+            HotkeyAction::Snapshot => "Research snapshot",
         }
     }
 }
@@ -101,6 +104,7 @@ pub struct Hotkeys {
     pub load_state: String,
     pub next_slot: String,
     pub previous_slot: String,
+    pub snapshot: String,
 }
 
 impl Hotkeys {
@@ -113,6 +117,7 @@ impl Hotkeys {
             HotkeyAction::LoadState => &self.load_state,
             HotkeyAction::PreviousSlot => &self.previous_slot,
             HotkeyAction::NextSlot => &self.next_slot,
+            HotkeyAction::Snapshot => &self.snapshot,
         }
     }
 
@@ -125,6 +130,7 @@ impl Hotkeys {
             HotkeyAction::LoadState => &mut self.load_state,
             HotkeyAction::PreviousSlot => &mut self.previous_slot,
             HotkeyAction::NextSlot => &mut self.next_slot,
+            HotkeyAction::Snapshot => &mut self.snapshot,
         };
         *slot = key_name;
     }
@@ -194,6 +200,7 @@ impl Default for Hotkeys {
             load_state: "F8".into(),
             next_slot: "F7".into(),
             previous_slot: "F6".into(),
+            snapshot: "F9".into(),
         }
     }
 }

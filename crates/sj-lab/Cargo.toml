@@ -1,0 +1,12 @@
+[package]
+name = "sj-lab"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+sj-emu = { path = "../sj-emu" }
+sj-game = { path = "../sj-game" }
+
+[lints]
+workspace = true

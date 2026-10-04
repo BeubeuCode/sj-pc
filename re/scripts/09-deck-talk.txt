@@ -1,0 +1,37 @@
+load re/scripts/checkpoints/deck.state
+press b
+wait 40
+press up 1
+press a
+wait 60
+snapshot talk-list
+press a
+wait 60
+mash a 1500 every 30
+snapshot talk1-done
+press b
+wait 40
+press up 1
+press a
+wait 60
+press down 1
+press a
+mash a 1500 every 30
+snapshot talk2-done
+press b
+wait 40
+press up 1
+press a
+wait 60
+press down 2
+press a
+mash a 1500 every 30
+snapshot talk3-done
+press b
+wait 40
+press up 2
+press a
+mash a 2400 every 30
+snapshot disembark-1
+mash a 2400 every 30
+snapshot disembark-2

@@ -1,4 +1,5 @@
 use glow::HasContext;
+use sj_game::image::RgbImage;
 use sj_game::layout::{screen_rects, PipSettings, NDS_ASPECT};
 use sj_game::rect::RectPx;
 use sj_game::settings::ScalingFilter;
@@ -127,6 +128,44 @@ impl Presenter {
             height_px,
             row_order: RowOrder::TopDown,
         });
+    }
+
+    pub fn read_frame(&self, gl: &glow::Context) -> Option<RgbImage> {
+        let frame = self.last_frame?;
+        let (width, height) = (frame.width_px as usize, frame.height_px as usize);
+        let mut rgba = vec![0u8; width * height * 4];
+        // SAFETY: `rgba` is exactly large enough for the frame rectangle inside our framebuffer.
+        unsafe {
+            gl.bind_framebuffer(glow::READ_FRAMEBUFFER, Some(self.framebuffer));
+            gl.read_pixels(
+                0,
+                0,
+                width as i32,
+                height as i32,
+                glow::RGBA,
+                glow::UNSIGNED_BYTE,
+                glow::PixelPackData::Slice(Some(&mut rgba)),
+            );
+            gl.bind_framebuffer(glow::READ_FRAMEBUFFER, None);
+        }
+        let mut rows: Vec<&[u8]> = rgba.chunks_exact(width * 4).collect();
+        if frame.row_order == RowOrder::BottomUp {
+            rows.reverse();
+        }
+        let rgb = rows
+            .iter()
+            .flat_map(|row| {
+                row.as_chunks::<4>()
+                    .0
+                    .iter()
+                    .flat_map(|pixel| [pixel[0], pixel[1], pixel[2]])
+            })
+            .collect();
+        Some(RgbImage {
+            width_px: frame.width_px,
+            height_px: frame.height_px,
+            rgb,
+        })
     }
 
     pub fn note_hardware_frame(&mut self, width_px: u32, height_px: u32) {

@@ -1,0 +1,14 @@
+load re/scripts/checkpoints/command-room.state
+press b
+wait 40
+press up 1
+press a
+wait 60
+press right 1
+press a
+wait 120
+snapshot zelenin-a
+mash a 1800 every 30
+snapshot zelenin-b
+mash a 2400 every 30
+snapshot zelenin-c

@@ -1,0 +1,27 @@
+load re/scripts/checkpoints/name-entry.state
+press start
+wait 60
+snapshot end-name-1
+press a
+wait 60
+snapshot end-name-2
+mash a 1800 every 30
+snapshot story-1
+mash a 1800 every 30
+snapshot story-2
+mash a 1800 every 30
+snapshot story-3
+mash a 1800 every 30
+snapshot story-4
+mash a 1800 every 30
+snapshot story-5
+mash a 1800 every 30
+snapshot story-6
+mash a 1800 every 30
+snapshot story-7
+mash a 1800 every 30
+snapshot story-8
+mash a 1800 every 30
+snapshot story-9
+mash a 1800 every 30
+snapshot story-10

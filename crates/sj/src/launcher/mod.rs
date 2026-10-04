@@ -2,7 +2,6 @@ mod binding_capture;
 mod controls_section;
 mod display_section;
 mod game_section;
-mod mouse_points;
 mod sound_section;
 mod state;
 
@@ -13,10 +12,10 @@ use sj_game::settings::Settings;
 
 use crate::capture::{encode_ppm, request_from_env};
 use crate::host_input::AxisThresholds;
+use crate::overlay::Overlay;
 use crate::platform::Platform;
 use crate::present::read_default_framebuffer;
 use binding_capture::{apply_capture, captured_input, Captured};
-use mouse_points::mouse_event_in_drawable_pixels;
 use state::{LauncherState, Outcome};
 
 const BACKGROUND_RGBA: [f32; 4] = [0.07, 0.07, 0.09, 1.0];
@@ -28,18 +27,17 @@ pub fn run(
     message: Option<String>,
 ) -> Option<(Platform, Settings)> {
     let _ = platform.window.set_title("Strange Journey - Launcher");
-    let mut egui = egui_sdl2::EguiGlow::new(&platform.window, platform.gl.clone(), None, false);
+    let mut overlay = Overlay::new(&platform);
     let mut state = LauncherState::new(settings, settings_path, message);
     let capture = request_from_env();
     let mut frames_drawn: u64 = 0;
     while state.outcome.is_none() {
         let events: Vec<Event> = platform.events.poll_iter().collect();
         for event in &events {
-            handle_event(&mut platform, &mut egui, &mut state, event);
+            handle_event(&mut platform, &mut overlay, &mut state, event);
         }
-        egui.run_ui(|root| state.show(root));
-        egui.clear(BACKGROUND_RGBA);
-        egui.paint();
+        overlay.clear(BACKGROUND_RGBA);
+        overlay.draw(|root| state.show(root));
         if capture
             .as_ref()
             .is_some_and(|request| frames_drawn >= request.after_frames)
@@ -53,7 +51,7 @@ pub fn run(
         platform.window.gl_swap_window();
         frames_drawn += 1;
     }
-    egui.destroy();
+    drop(overlay);
     match state.outcome {
         Some(Outcome::Play) => Some((platform, state.settings)),
         _ => None,
@@ -62,7 +60,7 @@ pub fn run(
 
 fn handle_event(
     platform: &mut Platform,
-    egui: &mut egui_sdl2::EguiGlow,
+    overlay: &mut Overlay,
     state: &mut LauncherState,
     event: &Event,
 ) {
@@ -88,8 +86,7 @@ fn handle_event(
             return;
         }
     }
-    let event = mouse_event_in_drawable_pixels(event, |x, y| platform.to_drawable(x, y));
-    let _ = egui.on_event(&platform.window, &event);
+    overlay.handle_event(platform, event);
 }
 
 fn capture_launcher(platform: &Platform, path: Option<&Path>) {

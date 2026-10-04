@@ -8,6 +8,7 @@ Status legend: `done`, `in progress`, `todo`.
 | M0 Tooling | done (Ghidra setup is manual, see `re/README.md`) | Rust, CMake, melonDS-ds submodule, core build script |
 | M1 Boots and plays | done, needs a play-test pass | libretro host, top screen + bottom PiP, input, savestates, fast-forward |
 | M2 Settings UI | half done | launcher screen done (egui); in-game F1 overlay still todo |
+| One-screen UI (A) research tooling | done | `sj-lab` headless runner, F9 snapshots, F12 RAM search |
 | M3 RAM watch + widescreen | todo | detect game mode, auto layout, 16:9 dungeon camera |
 | M4 Native UI via decomp | todo | ARM9 hooks, native map/menus/dialog drawn at full resolution |
 | M5 Modding | todo | asset redirect + Lua scripts over `GameApi` |
