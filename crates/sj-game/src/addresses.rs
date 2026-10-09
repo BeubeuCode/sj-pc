@@ -57,6 +57,12 @@ pub const DEMON_BASE_TABLE_ENTRIES: u32 = 491;
 pub const DEMON_BASE_RECORD_SIZE: u32 = 100;
 pub const BASE_RACE_OFFSET: u32 = 0x02;
 pub const BASE_AFFINITIES_OFFSET: u32 = 0x3A;
+// Second table of the same file, 128 bytes per demon ID. The status card shows affinities and
+// skills once the demon's Analyze gauge reaches the threshold byte (0x020D9970 compares them).
+pub const DEMON_ANALYZE_TABLE: Arm9Addr = Arm9Addr(0x021D_6410);
+pub const DEMON_ANALYZE_TABLE_ENTRIES: u32 = 490;
+pub const DEMON_ANALYZE_RECORD_SIZE: u32 = 128;
+pub const ANALYZE_DETAILS_THRESHOLD_OFFSET: u32 = 0x5B;
 
 // Player record in the save block. Max values and stats are confirmed by public Action Replay
 // codes; current HP/MP sit right before the name.
@@ -65,6 +71,13 @@ pub const PLAYER_MAX_MP: Arm9Addr = Arm9Addr(0x0221_42F0);
 pub const PLAYER_HP: Arm9Addr = Arm9Addr(0x0221_42F8);
 pub const PLAYER_MP: Arm9Addr = Arm9Addr(0x0221_42FA);
 pub const PLAYER_FIRST_NAME: Arm9Addr = Arm9Addr(0x0221_42FC);
+// Per-demon records in the save block, 36 bytes each, starting with demon ID 1 (0x0202EBB8 reads
+// them). The low 7 bits at +0x1E are the Analyze gauge, 0 to 100: Slime 21 and Pixie 10 still show
+// "??" affinities, Pixie 70 shows them.
+pub const DEMON_SAVE_RECORDS: Arm9Addr = Arm9Addr(0x0221_59D4);
+pub const DEMON_SAVE_RECORD_SIZE: u32 = 36;
+pub const SAVE_ANALYZE_GAUGE_OFFSET: u32 = 0x1E;
+pub const ANALYZE_GAUGE_MASK: u8 = 0x7F;
 
 // Points at the current top-level scene object; each scene points at its child at +0x1C. The battle
 // scene is the current one on the ship and its child in a dungeon. Its unit table (hero, three ally
@@ -100,3 +113,7 @@ pub const BATTLE_UNIT_NAME_OFFSET: u32 = 0x28;
 pub const BATTLE_UNIT_SKILLS_OFFSET: u32 = 0x1B8;
 // u16 demon ID; 0 for the hero.
 pub const BATTLE_UNIT_DEMON_ID_OFFSET: u32 = 0x1D8;
+// Set on enemies the player has never analyzed: the game shows "??? UNKNOWN" and "??" for level,
+// HP and MP instead of the demon (0x020EAD78 swaps the name on this bit).
+pub const BATTLE_UNIT_FLAGS_OFFSET: u32 = 0x282;
+pub const BATTLE_UNIT_FLAG_UNKNOWN: u8 = 0x04;

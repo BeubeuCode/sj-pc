@@ -108,15 +108,14 @@ pub fn draw_unit_panels(
         };
         let height = panel_height_ds_px(unit);
         canvas.frame_with(ENEMY_PANEL_DS_PX.0, height, line);
-        draw_name_strip(&canvas, name, unit.level, height);
+        draw_name_strip(&canvas, name, &level_text(unit), height);
         draw_stat_row(
             &canvas,
             HP_ROW_Y,
             "HP",
             HP_LABEL,
             HP_BAR,
-            unit.hp,
-            unit.max_hp,
+            stat(unit, unit.hp, unit.max_hp),
         );
         draw_stat_row(
             &canvas,
@@ -124,11 +123,22 @@ pub fn draw_unit_panels(
             "MP",
             MP_LABEL,
             MP_BAR,
-            unit.mp,
-            unit.max_mp,
+            stat(unit, unit.mp, unit.max_mp),
         );
         draw_details(&canvas, &detail_lines(unit));
     }
+}
+
+// Like the game's card, an unknown demon shows "??" and "???" instead of its numbers.
+fn level_text(unit: &UnitStatus) -> String {
+    if unit.unknown {
+        return "??".to_string();
+    }
+    unit.level.to_string()
+}
+
+fn stat(unit: &UnitStatus, value: u32, max: u32) -> Option<(u32, u32)> {
+    (!unit.unknown).then_some((value, max))
 }
 
 fn detail_lines(unit: &UnitStatus) -> Vec<DetailLine> {
@@ -221,7 +231,7 @@ fn draw_details(canvas: &PixelCanvas, lines: &[DetailLine]) {
     }
 }
 
-fn draw_name_strip(canvas: &PixelCanvas, name: &str, level: u16, height: u32) {
+fn draw_name_strip(canvas: &PixelCanvas, name: &str, level: &str, height: u32) {
     let inner_width = ENEMY_PANEL_DS_PX.0 - 2 * FRAME_DS_PX;
     for row in NAME_STRIP_ROWS.0..NAME_STRIP_ROWS.1 {
         let (left, right) = if row % 2 == 0 {
@@ -253,13 +263,12 @@ fn draw_name_strip(canvas: &PixelCanvas, name: &str, level: u16, height: u32) {
 }
 
 // "LV" and the level, right-aligned in the name strip; returns where it starts.
-fn draw_level(canvas: &PixelCanvas, level: u16) -> u32 {
-    let digits = level.to_string();
-    let digits_x = VALUE_RIGHT_X.saturating_sub(DIGITS.text_width(&digits));
+fn draw_level(canvas: &PixelCanvas, level: &str) -> u32 {
+    let digits_x = VALUE_RIGHT_X.saturating_sub(DIGITS.text_width(level));
     let label_x = digits_x.saturating_sub(LABEL.text_width("LV") + 2);
     let y = NAME_AT.1 + 1;
     canvas.outlined_text(&LABEL, label_x, y, "LV", LEVEL_LABEL);
-    canvas.text(&DIGITS, digits_x, y, &digits, NAME_TEXT);
+    canvas.text(&DIGITS, digits_x, y, level, NAME_TEXT);
     label_x
 }
 
@@ -269,12 +278,16 @@ fn draw_stat_row(
     label: &str,
     label_colour: Color32,
     bar_colours: [Color32; 2],
-    value: u32,
-    max: u32,
+    value_and_max: Option<(u32, u32)>,
 ) {
     canvas.outlined_text(&LABEL, LABEL_X, y, label, label_colour);
     canvas.fill(BAR_X - 1, y, BAR_WIDTH_DS_PX + 2, 4, BLACK);
     canvas.fill(BAR_X, y + 1, BAR_WIDTH_DS_PX, 2, BAR_EMPTY);
+    let Some((value, max)) = value_and_max else {
+        let digits_x = VALUE_RIGHT_X.saturating_sub(DIGITS.text_width("???"));
+        canvas.text(&DIGITS, digits_x, y, "???", NAME_TEXT);
+        return;
+    };
     let filled = filled_width(value, max, BAR_WIDTH_DS_PX);
     canvas.fill(BAR_X, y + 1, filled, 1, bar_colours[0]);
     canvas.fill(BAR_X, y + 2, filled, 1, bar_colours[1]);
@@ -351,6 +364,25 @@ mod tests {
             panel_height_ds_px(&UnitStatus::default()),
             ENEMY_PANEL_DS_PX.1
         );
+    }
+
+    #[test]
+    fn an_unknown_demon_shows_question_marks_instead_of_numbers() {
+        let unknown = UnitStatus {
+            unknown: true,
+            level: 2,
+            hp: 36,
+            max_hp: 36,
+            ..UnitStatus::default()
+        };
+        assert_eq!(level_text(&unknown), "??");
+        assert_eq!(stat(&unknown, unknown.hp, unknown.max_hp), None);
+        let known = UnitStatus {
+            unknown: false,
+            ..unknown
+        };
+        assert_eq!(level_text(&known), "2");
+        assert_eq!(stat(&known, known.hp, known.max_hp), Some((36, 36)));
     }
 
     #[test]

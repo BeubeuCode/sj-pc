@@ -120,5 +120,32 @@ fn race_affinities_and_skills_match_the_games_cards() {
         ["Agi"],
         "a Lv2 Pixie enemy only knows Agi"
     );
-    assert_eq!(enemies[1].race.as_deref(), Some("Spirit"));
+    assert!(enemies[1].unknown, "the game shows ??? UNKNOWN for it");
+    assert_eq!(enemies[1].race, None);
+}
+
+// What the game's enemy card reveals as the Analyze gauge fills: Pixie at 10 shows its name but
+// "??" affinities and "???" skills, Pixie at 70 shows them; a demon never met is "??? UNKNOWN".
+#[test]
+#[ignore = "needs battle snapshots in re/samples"]
+fn enemy_details_follow_the_analyze_gauge() {
+    use sj_game::battle::read_enemies;
+    let samples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../re/samples");
+    let cases = [
+        ("battle-first-1", [(true, false), (true, false)]),
+        ("battle-dungeon-1", [(false, false), (true, false)]),
+        ("battle-dungeon-talk-1", [(false, false), (true, false)]),
+        ("two-demons-1", [(false, true), (true, false)]),
+    ];
+    for (label, expected) in cases {
+        let Ok(ram) = std::fs::read(samples.join(label).join("main_ram.bin")) else {
+            eprintln!("skipped: no {label}");
+            continue;
+        };
+        let shown: Vec<_> = read_enemies(&Snapshot { ram })
+            .iter()
+            .map(|enemy| (enemy.unknown, enemy.affinities.is_some()))
+            .collect();
+        assert_eq!(shown, expected, "{label}");
+    }
 }

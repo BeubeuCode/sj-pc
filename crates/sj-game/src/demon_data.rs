@@ -1,10 +1,12 @@
 use crate::addr::Arm9Addr;
 use crate::addresses::{
-    BASE_AFFINITIES_OFFSET, BASE_RACE_OFFSET, DEMON_BASE_RECORD_SIZE, DEMON_BASE_TABLE,
-    DEMON_BASE_TABLE_ENTRIES, DEMON_NAME_TABLE, RACE_NAME_TABLE, SKILL_NAME_BLOCK_OFFSET,
-    SKILL_SLOTS, SKILL_STRINGS_FILE, TABLE_ID_OFFSET,
+    ANALYZE_DETAILS_THRESHOLD_OFFSET, ANALYZE_GAUGE_MASK, BASE_AFFINITIES_OFFSET, BASE_RACE_OFFSET,
+    DEMON_ANALYZE_RECORD_SIZE, DEMON_ANALYZE_TABLE, DEMON_ANALYZE_TABLE_ENTRIES,
+    DEMON_BASE_RECORD_SIZE, DEMON_BASE_TABLE, DEMON_BASE_TABLE_ENTRIES, DEMON_NAME_TABLE,
+    DEMON_SAVE_RECORDS, DEMON_SAVE_RECORD_SIZE, RACE_NAME_TABLE, SAVE_ANALYZE_GAUGE_OFFSET,
+    SKILL_NAME_BLOCK_OFFSET, SKILL_SLOTS, SKILL_STRINGS_FILE, TABLE_ID_OFFSET,
 };
-use crate::game_api::{read_u16, read_u32, GameApi};
+use crate::game_api::{read_u16, read_u32, read_u8, GameApi};
 use crate::text::decode_table_string;
 
 const MTBL_MAGIC: u32 = u32::from_le_bytes(*b"MTBL");
@@ -86,6 +88,26 @@ pub fn skill_names(game: &dyn GameApi, slots: Arm9Addr) -> Vec<String> {
         .collect()
 }
 
+// Whether the player has analyzed this demon far enough for the game to show its affinities and
+// skills on the enemy status card.
+pub fn details_analyzed(game: &dyn GameApi, id: u16) -> bool {
+    let id = u32::from(id);
+    if id == 0 || id >= DEMON_ANALYZE_TABLE_ENTRIES {
+        return false;
+    }
+    let gauge =
+        DEMON_SAVE_RECORDS.0 + (id - 1) * DEMON_SAVE_RECORD_SIZE + SAVE_ANALYZE_GAUGE_OFFSET;
+    let threshold =
+        DEMON_ANALYZE_TABLE.0 + id * DEMON_ANALYZE_RECORD_SIZE + ANALYZE_DETAILS_THRESHOLD_OFFSET;
+    match (
+        read_u8(game, Arm9Addr(gauge)),
+        read_u8(game, Arm9Addr(threshold)),
+    ) {
+        (Some(gauge), Some(threshold)) => gauge & ANALYZE_GAUGE_MASK >= threshold,
+        _ => false,
+    }
+}
+
 fn base_record(id: u16) -> Option<u32> {
     let id = u32::from(id);
     (id < DEMON_BASE_TABLE_ENTRIES).then(|| DEMON_BASE_TABLE.0 + id * DEMON_BASE_RECORD_SIZE)
@@ -165,6 +187,26 @@ pub mod tests {
         assert_eq!(affinities[3], Affinity::Strong);
         assert_eq!(affinities[0], Affinity::Normal);
         assert_eq!(race_name(&game, 999), None);
+    }
+
+    #[test]
+    fn details_need_the_gauge_to_reach_the_demons_threshold() {
+        let mut game = FakeGame::default();
+        let pixie = 146;
+        let gauge =
+            DEMON_SAVE_RECORDS.0 + (pixie - 1) * DEMON_SAVE_RECORD_SIZE + SAVE_ANALYZE_GAUGE_OFFSET;
+        let threshold = DEMON_ANALYZE_TABLE.0
+            + pixie * DEMON_ANALYZE_RECORD_SIZE
+            + ANALYZE_DETAILS_THRESHOLD_OFFSET;
+        put(&mut game, threshold, &[44]);
+        put(&mut game, gauge, &[10]);
+        assert!(!details_analyzed(&game, 146));
+        put(&mut game, gauge, &[0x80 + 70]);
+        assert!(
+            details_analyzed(&game, 146),
+            "the top bit is not part of the gauge"
+        );
+        assert!(!details_analyzed(&game, 0));
     }
 
     #[test]

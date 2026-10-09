@@ -27,7 +27,17 @@ was wrong in our runs, so confirm any cheat address in a snapshot before trustin
 Game data tables are TBB1/MBB containers in the ROM (`Data/Enemy/NKMBaseTable.tbb`,
 `Data/Skill/SkillStrData.mbb`...): a header, then TBL1 (fixed-size records) or MTBL (string offsets)
 blocks. Many stay loaded whole in RAM, so search a snapshot for a block's first bytes to find it.
-String table entries are numbered from 2 (entry = ID + 2).
+String table entries are numbered from 2 (entry = ID + 2). Loaded files sit in a table at
+`0x0214283C` (16 bytes each, data pointer at `+4`); code fetches them with `mov r0, #<file>` then
+`bl 0x0204459C` / `0x020445D0`, so grepping for that pair finds every reader of a table.
+
+- **Disassemble without Ghidra:** wrap a main RAM dump in an object and use Apple's LLVM objdump:
+  `printf '.arm\n.incbin "ram.bin"\n' > w.s && clang --target=armv5te-none-eabi -c w.s && objdump -d
+  --no-show-raw-insn --adjust-vma=0x02000000 w.o`. ARM-mode only (Thumb shows as garbage); grep for a
+  struct offset (`#0x282]`) or an immediate to find the code that reads a field. That is how the
+  Analyze gauge was found once memory diffs drowned in noise.
+- **What the game hides is game logic, not ours:** before showing a value the game hides (unknown
+  demons, unanalyzed affinities), find the game's own condition and copy it.
 
 ## Recipes
 - **Find a variable:** follow the memory-diff recipe in `docs/re/README.md`, then confirm with a Ghidra xref.

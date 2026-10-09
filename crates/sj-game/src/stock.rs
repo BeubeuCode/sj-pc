@@ -24,6 +24,8 @@ fn read_record(game: &dyn GameApi, slot: u32) -> Option<UnitStatus> {
     }
     Some(UnitStatus {
         slot,
+        demon_id: Some(id),
+        unknown: false,
         name: demon_name(game, id),
         race: race_name(game, id),
         level: field(STOCK_LEVEL_OFFSET)?,

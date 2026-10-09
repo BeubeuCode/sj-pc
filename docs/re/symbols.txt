@@ -18,6 +18,13 @@
 0x021E6CE0  -   demon_name_table     MTBL, entry = demon id + 2
 0x021E6860  -   race_name_table      MTBL, entry = race id + 2
 0x021CA430  49100 demon_base_table   491 x 100 bytes; race +0x02, skills +0x2E, affinities +0x3A
+0x021D6410  62720 demon_analyze_table  490 x 128 bytes; analyze thresholds +0x5A, +0x5B (affinities and skills)
+0x022159D4  17676 demon_save_records   491 x 36 bytes from id 1; analyze gauge +0x1E low 7 bits
+0x0214283C  784 loaded_file_table    49 x 16 bytes; +0x04 data ptr. 19 NKMBaseTable, 10 SkillStrData
+0x0204459C  -   fn_loaded_file       code; r0 file index -> data ptr
+0x0202EBB8  -   fn_analyze_gauge     code; r0 demon id -> gauge 0..100
+0x020D9970  -   enemy_card_details   code; shows affinities/skills when gauge >= threshold +0x5B
+0x020EAD78  -   enemy_card_name      code; unit +0x282 bit 0x04 -> fixed UNKNOWN name
 0x021428E0  4   skill_strings_file   ptr to loaded SkillStrData.mbb; names MTBL at +0x20, entry = skill id + 2
 0x0215F03C  -   render_state         +0x24 display mode (0 alternate, 1 top, 2 bottom, 3 none)
 0x021437DC  4   screen_parity        mode 0: 0 top geometry this frame, 1 bottom

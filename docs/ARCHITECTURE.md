@@ -51,7 +51,9 @@ and asks `sj_game::screen_director::plan` what to show:
   name table; repeated demons get letters ("Slime A", "Slime B"). Below HP and MP a card lists the
   race, the non-normal affinities ("Wk Fire Expel") and the skills (`sj_game::demon_data` reads the
   game's resident base table and string tables), so cards have different heights and the stack
-  shrinks to fit the window. They sit in the right side bar when the
+  shrinks to fit the window. Enemy cards show only what the game's own card would: "???" and no
+  numbers for a demon never analyzed, and no affinities or skills until its Analyze gauge reaches the
+  demon's threshold (`battle::read_enemies`). They sit in the right side bar when the
   window is wider than 4:3, otherwise over the right of the image.
 - **Battle bottom screen, native:** the bottom screen never shows in battle. The panels follow the
   page the game's bottom screen is on (`battle::bottom_page`), so L and R switch them as on the DS:

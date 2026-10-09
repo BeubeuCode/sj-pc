@@ -3,13 +3,15 @@ use crate::addresses::{
     BATTLE_ENEMY_SLOT_COUNT, BATTLE_FIRST_ENEMY_SLOT, BATTLE_PAGE_ENEMY_STATUS,
     BATTLE_PAGE_PARTY_STATUS, BATTLE_PAGE_SUMMON_LIST, BATTLE_PARTY_SLOT_COUNT,
     BATTLE_SCENE_UNIT_TABLE_OFFSET, BATTLE_TABLE_HERO_UNIT_OFFSET, BATTLE_UI_LIST_CURSOR_OFFSET,
-    BATTLE_UI_PAGE_OFFSET, BATTLE_UNIT_DEMON_ID_OFFSET, BATTLE_UNIT_HP_OFFSET,
-    BATTLE_UNIT_LEVEL_OFFSET, BATTLE_UNIT_MAX_HP_OFFSET, BATTLE_UNIT_MAX_MP_OFFSET,
-    BATTLE_UNIT_MP_OFFSET, BATTLE_UNIT_NAME_OFFSET, BATTLE_UNIT_SKILLS_OFFSET, CURRENT_SCENE,
-    SCENE_CHILD_OFFSET,
+    BATTLE_UI_PAGE_OFFSET, BATTLE_UNIT_DEMON_ID_OFFSET, BATTLE_UNIT_FLAGS_OFFSET,
+    BATTLE_UNIT_FLAG_UNKNOWN, BATTLE_UNIT_HP_OFFSET, BATTLE_UNIT_LEVEL_OFFSET,
+    BATTLE_UNIT_MAX_HP_OFFSET, BATTLE_UNIT_MAX_MP_OFFSET, BATTLE_UNIT_MP_OFFSET,
+    BATTLE_UNIT_NAME_OFFSET, BATTLE_UNIT_SKILLS_OFFSET, CURRENT_SCENE, SCENE_CHILD_OFFSET,
 };
-use crate::demon_data::{affinities, race_name, skill_names, Affinity, ELEMENT_COUNT};
-use crate::game_api::{read_u16, read_u32, GameApi};
+use crate::demon_data::{
+    affinities, details_analyzed, race_name, skill_names, Affinity, ELEMENT_COUNT,
+};
+use crate::game_api::{read_u16, read_u32, read_u8, GameApi};
 use crate::text::{decode_save_string, decode_table_string};
 
 // Above any stat the game can show; anything larger means we are not looking at a battle unit.
@@ -21,6 +23,9 @@ const NAME_MAX_BYTES: usize = 24;
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct UnitStatus {
     pub slot: u32,
+    pub demon_id: Option<u16>,
+    // A demon the player has never analyzed: the game shows no name, level, HP or MP for it.
+    pub unknown: bool,
     pub name: Option<String>,
     // None for the hero, who has no race and whose affinities come from gear.
     pub race: Option<String>,
@@ -50,6 +55,25 @@ pub enum BottomPage {
 
 pub fn read_enemies(game: &dyn GameApi) -> Vec<UnitStatus> {
     read_slots(game, BATTLE_FIRST_ENEMY_SLOT, BATTLE_ENEMY_SLOT_COUNT)
+        .into_iter()
+        .map(|enemy| as_analyzed(game, enemy))
+        .collect()
+}
+
+// Only what the game's enemy card would show: nothing of an unknown demon, and no affinities or
+// skills until the Analyze gauge reaches the demon's threshold.
+fn as_analyzed(game: &dyn GameApi, mut enemy: UnitStatus) -> UnitStatus {
+    if enemy.unknown {
+        enemy.name = None;
+        enemy.race = None;
+    }
+    let details_shown =
+        !enemy.unknown && enemy.demon_id.is_some_and(|id| details_analyzed(game, id));
+    if !details_shown {
+        enemy.affinities = None;
+        enemy.skills.clear();
+    }
+    enemy
 }
 
 // The hero and up to three demons out in battle.
@@ -120,8 +144,11 @@ fn read_unit(game: &dyn GameApi, unit: u32, slot: u32) -> Option<UnitStatus> {
         Arm9Addr(unit.wrapping_add(BATTLE_UNIT_DEMON_ID_OFFSET)),
     )
     .filter(|&id| id != 0);
+    let flags = read_u8(game, Arm9Addr(unit.wrapping_add(BATTLE_UNIT_FLAGS_OFFSET)))?;
     let status = UnitStatus {
         slot,
+        demon_id,
+        unknown: flags & BATTLE_UNIT_FLAG_UNKNOWN != 0,
         name: field(BATTLE_UNIT_NAME_OFFSET).and_then(|pointer| read_name(game, pointer)),
         race: demon_id.and_then(|id| race_name(game, id)),
         level: read_u16(game, Arm9Addr(unit.wrapping_add(BATTLE_UNIT_LEVEL_OFFSET)))?,
@@ -326,6 +353,46 @@ mod tests {
     fn repeated_demons_get_letters_and_unique_ones_do_not() {
         let enemies = [enemy(4, "Slime"), enemy(5, "Pixie"), enemy(6, "Slime")];
         assert_eq!(display_names(&enemies), ["Slime A", "Pixie", "Slime B"]);
+    }
+
+    #[test]
+    fn unknown_and_unanalyzed_enemies_keep_their_secrets() {
+        let mut game = FakeGame::default();
+        put_u32(&mut game, CURRENT_SCENE.0, SCENE);
+        put_battle_scene(&mut game, SCENE);
+        let unit = 0x0222_BA9C;
+        put_unit(&mut game, 0, unit, [36, 36, 16, 16]);
+        put_u32(&mut game, unit + BATTLE_UNIT_DEMON_ID_OFFSET, 146);
+        put_u32(&mut game, unit + BATTLE_UNIT_SKILLS_OFFSET, 1);
+        let race = crate::addresses::DEMON_BASE_TABLE.0
+            + 146 * crate::addresses::DEMON_BASE_RECORD_SIZE
+            + crate::addresses::BASE_RACE_OFFSET;
+        put_u32(&mut game, race, 5);
+        crate::demon_data::tests::put_table_string(
+            &mut game,
+            crate::addresses::RACE_NAME_TABLE.0,
+            5,
+            "Fairy",
+        );
+        let threshold = crate::addresses::DEMON_ANALYZE_TABLE.0
+            + 146 * crate::addresses::DEMON_ANALYZE_RECORD_SIZE
+            + crate::addresses::ANALYZE_DETAILS_THRESHOLD_OFFSET;
+        put_u32(&mut game, threshold, 44);
+        let enemy = &read_enemies(&game)[0];
+        assert_eq!(enemy.race.as_deref(), Some("Fairy"));
+        assert_eq!(
+            (enemy.affinities, enemy.skills.len()),
+            (None, 0),
+            "gauge at 0"
+        );
+
+        let flags = unit + BATTLE_UNIT_FLAGS_OFFSET;
+        let offset = (flags - MAIN_RAM_BASE.0) as usize;
+        game.ram[offset] = BATTLE_UNIT_FLAG_UNKNOWN;
+        let enemy = &read_enemies(&game)[0];
+        assert!(enemy.unknown);
+        assert_eq!((enemy.name.as_deref(), enemy.race.as_deref()), (None, None));
+        assert_eq!(enemy.hp, 36, "the HUD hides it, as the game does");
     }
 
     #[test]

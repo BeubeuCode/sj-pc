@@ -428,6 +428,7 @@ fn digit_glyph(ch: char) -> Option<&'static [u8]> {
         '7' => &[0b111, 0b001, 0b001, 0b001, 0b001],
         '8' => &[0b111, 0b101, 0b111, 0b101, 0b111],
         '9' => &[0b111, 0b101, 0b111, 0b001, 0b111],
+        '?' => &[0b111, 0b001, 0b010, 0b000, 0b010],
         _ => return None,
     };
     Some(rows)
@@ -446,7 +447,7 @@ mod tests {
                 "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-.'? ",
             ),
             (&LABEL, 5, "HLMPV"),
-            (&DIGITS, 5, "0123456789"),
+            (&DIGITS, 5, "0123456789?"),
         ] {
             for ch in chars.chars() {
                 let rows = glyphs.rows(ch).unwrap();
